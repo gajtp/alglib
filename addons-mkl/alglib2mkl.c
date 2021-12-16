@@ -26,6 +26,32 @@
 #error ALGLIB OS define (AE_OS) is not specified!
 #endif
 
+/*************************************************************************
+Standard function wrappers for better GLIBC portability
+*************************************************************************/
+#if defined(_ALGLIB2MKL_GLIBC_WRAPPERS)
+#include <math.h>
+
+__asm__(".symver exp,exp@GLIBC_2.2.5");
+__asm__(".symver log,log@GLIBC_2.2.5");
+__asm__(".symver pow,pow@GLIBC_2.2.5");
+
+double __wrap_exp(double x)
+{
+    return exp(x);
+}
+
+double __wrap_log(double x)
+{
+    return log(x);
+}
+
+double __wrap_pow(double x, double y)
+{
+    return pow(x, y);
+}
+#endif
+
 /*
  * This is a watchdog thread which periodically calls mkl_free_buffers()
  * to make sure that no unnecessary memory consumption growth is observed.

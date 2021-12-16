@@ -18,8 +18,8 @@ Manual.
 
 NOTE: if you activate MKL extensions, then  following  license  terms  are
       applied to you (in addition to ALGLIB License Agreement):
-      * mkl-2017-license.txt
-      * mkl-2017-third-party-programs.txt
+      * mkl-2021-license.txt
+      * mkl-2021-third-party-programs.txt
 
 
 
