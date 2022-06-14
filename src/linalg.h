@@ -1,5 +1,5 @@
 /*************************************************************************
-ALGLIB 3.18.0 (source code generated 2021-10-25)
+ALGLIB 3.19.0 (source code generated 2022-06-07)
 Copyright (c) Sergey Bochkanov (ALGLIB project).
 
 >>> SOURCE LICENSE >>>
@@ -251,6 +251,7 @@ typedef struct
     ae_bool extendeddebug;
     ae_bool dotrace;
     ae_bool dotracesupernodalstructure;
+    ae_vector referenceridx;
     ae_int_t nsuper;
     ae_vector parentsupernode;
     ae_vector supercolrange;
@@ -274,6 +275,8 @@ typedef struct
     ae_vector diagd;
     ae_vector wrkrows;
     ae_vector flagarray;
+    ae_vector eligible;
+    ae_vector curpriorities;
     ae_vector tmpparent;
     ae_vector node2supernode;
     ae_vector u2smap;
@@ -358,6 +361,7 @@ typedef struct
     double epsdiag;
     ae_int_t itsperformed;
     ae_int_t retcode;
+    double reprelres;
     rcommstate rstate;
 } fblsgmresstate;
 #endif
@@ -9036,6 +9040,7 @@ void generateamdpermutation(sparsematrix* a,
      amdbuffer* buf,
      ae_state *_state);
 ae_int_t generateamdpermutationx(sparsematrix* a,
+     /* Boolean */ ae_vector* eligible,
      ae_int_t n,
      /* Integer */ ae_vector* perm,
      /* Integer */ ae_vector* invperm,
@@ -9066,6 +9071,7 @@ void _amdbuffer_destroy(void* _p);
 #if defined(AE_COMPILE_SPCHOL) || !defined(AE_PARTIAL_BUILD)
 ae_int_t spsymmgetmaxfastkernel(ae_state *_state);
 ae_bool spsymmanalyze(sparsematrix* a,
+     /* Integer */ ae_vector* priorities,
      ae_int_t facttype,
      ae_int_t permtype,
      spcholanalysis* analysis,

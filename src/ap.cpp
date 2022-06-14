@@ -1,5 +1,5 @@
 /*************************************************************************
-ALGLIB 3.18.0 (source code generated 2021-10-25)
+ALGLIB 3.19.0 (source code generated 2022-06-07)
 Copyright (c) Sergey Bochkanov (ALGLIB project).
 
 >>> SOURCE LICENSE >>>
@@ -149,6 +149,10 @@ namespace alglib_impl
 #define _ALGLIB_GET_GLOBAL_THREADING       1001
 #define _ALGLIB_GET_NWORKERS               1002
 
+#if defined(ALGLIB_REDZONE)
+#define _ALGLIB_REDZONE_VAL                 0x3c
+#endif
+
 /*************************************************************************
 Lock.
 
@@ -283,7 +287,10 @@ static char     _ae_bool_must_be_8_bits_wide [1-2*((int)(sizeof(ae_bool))-1)*((i
 static char  _ae_int32_t_must_be_32_bits_wide[1-2*((int)(sizeof(ae_int32_t))-4)*((int)(sizeof(ae_int32_t))-4)];
 static char  _ae_int64_t_must_be_64_bits_wide[1-2*((int)(sizeof(ae_int64_t))-8)*((int)(sizeof(ae_int64_t))-8)];
 static char _ae_uint64_t_must_be_64_bits_wide[1-2*((int)(sizeof(ae_uint64_t))-8)*((int)(sizeof(ae_uint64_t))-8)];
-static char  _ae_int_t_must_be_pointer_sized [1-2*((int)(sizeof(ae_int_t))-(int)sizeof(void*))*((int)(sizeof(ae_int_t))-(int)(sizeof(void*)))];  
+static char  _ae_int_t_must_be_pointer_sized [1-2*((int)(sizeof(ae_int_t))-(int)sizeof(void*))*((int)(sizeof(ae_int_t))-(int)(sizeof(void*)))];
+#if defined(ALGLIB_REDZONE)
+static char _ae_redzone_must_be_multiple_of_64[1-2*(((ALGLIB_REDZONE)<(AE_DATA_ALIGN)) ? 1 : 0)-2*(((ALGLIB_REDZONE)%(AE_DATA_ALIGN)) ? 1 : 0)];
+#endif
 
 /*
  * This variable is used to prevent some tricky optimizations which may degrade multithreaded performance.
@@ -824,6 +831,12 @@ void* aligned_malloc(size_t size, size_t alignment)
     return ae_static_malloc(size, alignment);
 #else
     char *result = NULL;
+    void *block;
+    size_t alloc_size;
+#if defined(ALGLIB_REDZONE)
+    char *redzone0;
+    char *redzone1;
+#endif
     
     if( size==0 )
         return NULL;
@@ -832,32 +845,31 @@ void* aligned_malloc(size_t size, size_t alignment)
     if( _malloc_failure_after>0 && _alloc_counter_total>=_malloc_failure_after )
         return NULL;
     
-    /* allocate */
-    if( alignment<=1 )
-    {
-        /* no alignment, just call alloc */
-        void *block;
-        void **p; ;
-        block = malloc(sizeof(void*)+size);
-        if( block==NULL )
-            return NULL;
-        p = (void**)block;
-        *p = block;
-        result = (char*)((char*)block+sizeof(void*));
-    }
-    else
-    {
-        /* align */
-        void *block;
-        block = malloc(alignment-1+sizeof(void*)+size);
-        if( block==NULL )
-            return NULL;
-        result = (char*)block+sizeof(void*);
-        /*if( (result-(char*)0)%alignment!=0 )
-            result += alignment - (result-(char*)0)%alignment;*/
-        result = (char*)ae_align(result, alignment);
-        *((void**)(result-sizeof(void*))) = block;
-    }
+    /*
+     * Allocate, handling case with alignment=1 specially (no padding is added)
+     *
+     */
+    alloc_size = 2*sizeof(void*)+size;
+    if( alignment>1 )
+        alloc_size += alignment-1;
+#if defined(ALGLIB_REDZONE)
+    alloc_size += 2*(ALGLIB_REDZONE);
+#endif
+    block = malloc(alloc_size);
+    if( block==NULL )
+        return NULL;
+    result = (char*)block+2*sizeof(void*);
+    result = (char*)ae_align(result, alignment);
+    *((void**)(result-sizeof(void*))) = block;
+#if defined(ALGLIB_REDZONE)
+    redzone0 = result;
+    result   = redzone0+(ALGLIB_REDZONE);
+    redzone1 = result+size;
+    ae_assert(ae_misalignment(result,alignment)==0, "ALGLIB: improperly configured red zone size - is not multiple of the current alignment", NULL);
+    *((void**)(redzone0-2*sizeof(void*))) = redzone1;
+    memset(redzone0, _ALGLIB_REDZONE_VAL, ALGLIB_REDZONE);
+    memset(redzone1, _ALGLIB_REDZONE_VAL, ALGLIB_REDZONE);
+#endif
     
     /* update counters (if flag is set) */
     if( _use_alloc_counter )
@@ -878,9 +890,15 @@ void* aligned_extract_ptr(void *block)
 #if AE_MALLOC==AE_BASIC_STATIC_MALLOC
     return NULL;
 #else
+    char *ptr;
     if( block==NULL )
         return NULL;
-    return *((void**)((char*)block-sizeof(void*)));
+    ptr = (char*)block;
+#if defined(ALGLIB_REDZONE)
+    ptr -= (ALGLIB_REDZONE);
+#endif
+    ptr -= sizeof(void*);
+    return *((void**)ptr);
 #endif
 }
 
@@ -889,11 +907,42 @@ void aligned_free(void *block)
 #if AE_MALLOC==AE_BASIC_STATIC_MALLOC
     ae_static_free(block);
 #else
-    void *p;
+    /*
+     * Handle NULL input
+     */
     if( block==NULL )
         return;
-    p = aligned_extract_ptr(block);
-    free(p);
+    
+    /*
+     * If red zone is activated, check it before deallocation
+     */
+#if defined(ALGLIB_REDZONE)
+    {
+        char *redzone0 = (char*)block-(ALGLIB_REDZONE);
+        char *redzone1 = (char*)(*((void**)(redzone0-2*sizeof(void*))));
+        ae_int_t i;
+        for(i=0; i<(ALGLIB_REDZONE); i++)
+        {
+            if( redzone0[i]!=_ALGLIB_REDZONE_VAL )
+            {
+                const char *msg = "ALGLIB: red zone corruption is detected (write prior to the block beginning?)";
+                fprintf(stderr, "%s\n", msg);
+                ae_assert(ae_false, msg, NULL);
+            }
+            if( redzone1[i]!=_ALGLIB_REDZONE_VAL )
+            {
+                const char *msg = "ALGLIB: red zone corruption is detected (write past the end of the block?)";
+                fprintf(stderr, "%s\n", msg);
+                ae_assert(ae_false, msg, NULL);
+            }
+        }
+    }
+#endif
+    
+    /*
+     * Free the memory and optionally update allocation counters
+     */
+    free(aligned_extract_ptr(block));
     if( _use_alloc_counter )
         ae_optional_atomic_sub_i(&_alloc_counter, 1);
 #endif
@@ -2456,7 +2505,7 @@ void ae_trace_file(const char *tags, const char *filename)
     strncat(alglib_trace_tags, tags, ALGLIB_TRACE_TAGS_LEN);
     strcat(alglib_trace_tags, ",");
     for(int i=0; alglib_trace_tags[i]!=0; i++)
-        alglib_trace_tags[i] = tolower(alglib_trace_tags[i]);
+        alglib_trace_tags[i] = (char)tolower(alglib_trace_tags[i]);
     
     /*
      * set up trace
@@ -2495,7 +2544,7 @@ ae_bool ae_is_trace_enabled(const char *tag)
     strncat(buf, tag, ALGLIB_TRACE_TAGS_LEN);
     strcat(buf, "?");
     for(int i=0; buf[i]!=0; i++)
-        buf[i] = tolower(buf[i]);
+        buf[i] = (char)tolower(buf[i]);
             
     /* contains tag (followed by comma, which means exact match) */
     buf[strlen(buf)-1] = ',';
@@ -13300,6 +13349,71 @@ void rmulr(ae_int_t n,
 
 
 /*************************************************************************
+Performs inplace computation of Sqrt(X)
+
+INPUT PARAMETERS:
+    N       -   vector length
+    X       -   array[N], vector to process
+
+OUTPUT PARAMETERS:
+    X       -   elements 0...N-1 replaced by Sqrt(X)
+
+  -- ALGLIB --
+     Copyright 20.01.2020 by Bochkanov Sergey
+*************************************************************************/
+void rsqrtv(ae_int_t n,
+     /* Real    */ ae_vector* x,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+    /*
+     * Try fast kernels.
+     * On success this macro will return, on failure to find kernel it will pass execution to the generic C implementation
+     */
+    if( n>=_ABLASF_KERNEL_SIZE1 )
+        _ALGLIB_KERNEL_VOID_AVX2(rsqrtv,
+            (n,x->ptr.p_double,_state))
+
+    for(i=0; i<=n-1; i++)
+        x->ptr.p_double[i] = sqrt(x->ptr.p_double[i]);
+}
+
+
+/*************************************************************************
+Performs inplace computation of Sqrt(X[RowIdx,*])
+
+INPUT PARAMETERS:
+    N       -   vector length
+    X       -   array[?,N], matrix to process
+
+OUTPUT PARAMETERS:
+    X       -   elements 0...N-1 replaced by Sqrt(X)
+
+  -- ALGLIB --
+     Copyright 20.01.2020 by Bochkanov Sergey
+*************************************************************************/
+void rsqrtr(ae_int_t n,
+     /* Real    */ ae_matrix* x,
+     ae_int_t rowidx,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+    /*
+     * Try fast kernels.
+     * On success this macro will return, on failure to find kernel it will pass execution to the generic C implementation
+     */
+    if( n>=_ABLASF_KERNEL_SIZE1 )
+        _ALGLIB_KERNEL_VOID_AVX2(rsqrtv,
+            (n, x->ptr.pp_double[rowidx], _state))
+
+    for(i=0; i<=n-1; i++)
+        x->ptr.pp_double[rowidx][i] = sqrt(x->ptr.pp_double[rowidx][i]);
+}
+
+
+/*************************************************************************
 Performs inplace multiplication of X[OffsX:OffsX+N-1] by V
 
 INPUT PARAMETERS:
@@ -13540,6 +13654,154 @@ void raddvx(ae_int_t n,
 
 
 /*************************************************************************
+Performs inplace addition of Y[]*Z[] to X[]
+
+INPUT PARAMETERS:
+    N       -   vector length
+    Y       -   array[N], vector to process
+    Z       -   array[N], vector to process
+    X       -   array[N], vector to process
+
+RESULT:
+    X := X + Y*Z
+
+  -- ALGLIB --
+     Copyright 29.10.2021 by Bochkanov Sergey
+*************************************************************************/
+void rmuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+    /*
+     * Try fast kernels.
+     * On success this macro will return, on failure to find kernel it will pass execution to the generic C implementation
+     */
+    if( n>=_ABLASF_KERNEL_SIZE1 )
+        _ALGLIB_KERNEL_VOID_FMA(rmuladdv, (n, y->ptr.p_double, z->ptr.p_double, x->ptr.p_double, _state))
+
+    for(i=0; i<=n-1; i++)
+    {
+        x->ptr.p_double[i] = x->ptr.p_double[i]+y->ptr.p_double[i]*z->ptr.p_double[i];
+    }
+}
+
+
+/*************************************************************************
+Performs inplace subtraction of Y[]*Z[] from X[]
+
+INPUT PARAMETERS:
+    N       -   vector length
+    Y       -   array[N], vector to process
+    Z       -   array[N], vector to process
+    X       -   array[N], vector to process
+
+RESULT:
+    X := X - Y*Z
+
+  -- ALGLIB --
+     Copyright 29.10.2021 by Bochkanov Sergey
+*************************************************************************/
+void rnegmuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+    /*
+     * Try fast kernels.
+     * On success this macro will return, on failure to find kernel it will pass execution to the generic C implementation
+     */
+    if( n>=_ABLASF_KERNEL_SIZE1 )
+        _ALGLIB_KERNEL_VOID_FMA(rnegmuladdv, (n, y->ptr.p_double, z->ptr.p_double, x->ptr.p_double, _state))
+
+    for(i=0; i<=n-1; i++)
+    {
+        x->ptr.p_double[i] -= y->ptr.p_double[i]*z->ptr.p_double[i];
+    }
+}
+
+
+/*************************************************************************
+Performs addition of Y[]*Z[] to X[]
+
+INPUT PARAMETERS:
+    N       -   vector length
+    Y       -   array[N], vector to process
+    Z       -   array[N], vector to process
+    X       -   array[N], vector to process
+    R       -   array[N], vector to process
+
+RESULT:
+    R := X + Y*Z
+
+  -- ALGLIB --
+     Copyright 29.10.2021 by Bochkanov Sergey
+*************************************************************************/
+void rcopymuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* r,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+    /*
+     * Try fast kernels.
+     * On success this macro will return, on failure to find kernel it will pass execution to the generic C implementation
+     */
+    if( n>=_ABLASF_KERNEL_SIZE1 )
+        _ALGLIB_KERNEL_VOID_FMA(rcopymuladdv, (n, y->ptr.p_double, z->ptr.p_double, x->ptr.p_double, r->ptr.p_double, _state))
+
+    for(i=0; i<=n-1; i++)
+        r->ptr.p_double[i] = x->ptr.p_double[i]+y->ptr.p_double[i]*z->ptr.p_double[i];
+}
+
+
+/*************************************************************************
+Performs subtraction of Y[]*Z[] from X[]
+
+INPUT PARAMETERS:
+    N       -   vector length
+    Y       -   array[N], vector to process
+    Z       -   array[N], vector to process
+    X       -   array[N], vector to process
+    R       -   array[N], vector to process
+
+RESULT:
+    R := X - Y*Z
+
+  -- ALGLIB --
+     Copyright 29.10.2021 by Bochkanov Sergey
+*************************************************************************/
+void rcopynegmuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* r,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+    /*
+     * Try fast kernels.
+     * On success this macro will return, on failure to find kernel it will pass execution to the generic C implementation
+     */
+    if( n>=_ABLASF_KERNEL_SIZE1 )
+        _ALGLIB_KERNEL_VOID_FMA(rcopynegmuladdv, (n, y->ptr.p_double, z->ptr.p_double, x->ptr.p_double, r->ptr.p_double, _state))
+
+    for(i=0; i<=n-1; i++)
+        r->ptr.p_double[i] = x->ptr.p_double[i]-y->ptr.p_double[i]*z->ptr.p_double[i];
+}
+
+
+/*************************************************************************
 Performs componentwise multiplication of vector X[] by vector Y[]
 
 INPUT PARAMETERS:
@@ -13648,6 +13910,90 @@ void rmergemulrv(ae_int_t n,
     {
         x->ptr.p_double[i] = x->ptr.p_double[i]*y->ptr.pp_double[rowidx][i];
     }
+}
+
+
+
+
+/*************************************************************************
+Performs componentwise division of vector X[] by vector Y[]
+
+  -- ALGLIB --
+     Copyright 20.01.2020 by Bochkanov Sergey
+*************************************************************************/
+void rmergedivv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* x,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+    /*
+     * Try fast kernels.
+     * On success this macro will return, on failure to find kernel it will pass execution to the generic C implementation
+     */
+    if( n>=_ABLASF_KERNEL_SIZE1 )
+        _ALGLIB_KERNEL_VOID_AVX2(rmergedivv,
+            (n,y->ptr.p_double,x->ptr.p_double,_state))
+
+
+    for(i=0; i<=n-1; i++)
+        x->ptr.p_double[i] /= y->ptr.p_double[i];
+}
+
+
+/*************************************************************************
+Performs componentwise division of row X[] by vector Y[]
+
+  -- ALGLIB --
+     Copyright 20.01.2020 by Bochkanov Sergey
+*************************************************************************/
+void rmergedivvr(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_matrix* x,
+     ae_int_t rowidx,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+    /*
+     * Try fast kernels.
+     * On success this macro will return, on failure to find kernel it will pass execution to the generic C implementation
+     */
+    if( n>=_ABLASF_KERNEL_SIZE1 )
+        _ALGLIB_KERNEL_VOID_AVX2(rmergedivv,
+            (n,y->ptr.p_double,x->ptr.pp_double[rowidx],_state))
+
+
+    for(i=0; i<=n-1; i++)
+        x->ptr.pp_double[rowidx][i] /= y->ptr.p_double[i];
+}
+
+
+/*************************************************************************
+Performs componentwise division of row X[] by vector Y[]
+
+  -- ALGLIB --
+     Copyright 20.01.2020 by Bochkanov Sergey
+*************************************************************************/
+void rmergedivrv(ae_int_t n,
+     /* Real    */ ae_matrix* y,
+     ae_int_t rowidx,
+     /* Real    */ ae_vector* x,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+    /*
+     * Try fast kernels.
+     * On success this macro will return, on failure to find kernel it will pass execution to the generic C implementation
+     */
+    if( n>=_ABLASF_KERNEL_SIZE1 )
+        _ALGLIB_KERNEL_VOID_AVX2(rmergedivv,
+            (n,y->ptr.pp_double[rowidx],x->ptr.p_double,_state))
+
+    for(i=0; i<=n-1; i++)
+        x->ptr.p_double[i] /= y->ptr.pp_double[rowidx][i];
 }
 
 /*************************************************************************

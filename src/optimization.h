@@ -1,5 +1,5 @@
 /*************************************************************************
-ALGLIB 3.18.0 (source code generated 2021-10-25)
+ALGLIB 3.19.0 (source code generated 2022-06-07)
 Copyright (c) Sergey Bochkanov (ALGLIB project).
 
 >>> SOURCE LICENSE >>>
@@ -650,6 +650,17 @@ typedef struct
 } vipmvars;
 typedef struct
 {
+    sparsematrix rawsystem;
+    ae_vector effectivediag;
+    ae_vector isdiagonal;
+    ae_vector rowdegrees;
+    ae_vector coldegrees;
+    ae_int_t ntotal;
+    spcholanalysis analysis;
+    ae_vector priorities;
+} vipmreducedsparsesystem;
+typedef struct
+{
     ae_vector sigma;
     ae_vector beta;
     ae_vector rho;
@@ -679,6 +690,7 @@ typedef struct
     sparsematrix sparseh;
     ae_vector diagr;
     ae_int_t hkind;
+    ae_bool isdiagonalh;
     ae_vector bndl;
     ae_vector bndu;
     ae_vector rawbndl;
@@ -697,7 +709,6 @@ typedef struct
     ae_vector hasr;
     ae_int_t mdense;
     ae_int_t msparse;
-    vipmvars x0;
     vipmvars current;
     vipmvars best;
     vipmvars trial;
@@ -708,6 +719,10 @@ typedef struct
     ae_vector hasts;
     ae_vector haswv;
     ae_vector haspq;
+    ae_int_t cntgz;
+    ae_int_t cntts;
+    ae_int_t cntwv;
+    ae_int_t cntpq;
     ae_int_t repiterationscount;
     ae_int_t repncholesky;
     ae_bool dotrace;
@@ -734,12 +749,8 @@ typedef struct
     ae_vector factregdhrh;
     ae_vector factinvregdzrz;
     ae_vector factregewave;
-    sparsematrix factsparsekkttmpl;
-    sparsematrix factsparsekkt;
-    ae_vector factsparsekktpivp;
     ae_vector facttmpdiag;
-    spcholanalysis ldltanalysis;
-    ae_vector factsparsediagd;
+    vipmreducedsparsesystem reducedsparsesystem;
     vipmrighthandside rhs;
     ae_vector rhsalphacap;
     ae_vector rhsbetacap;
@@ -1487,6 +1498,7 @@ typedef struct
     minslpphase13state state13;
     minslpphase2state state2;
     double trustrad;
+    double bigc;
     ae_int_t lpfailurecnt;
     ae_int_t fstagnationcnt;
     ae_vector step0x;
@@ -11299,6 +11311,50 @@ void lptestproblemcreate(const ae_int_t n, const bool hasknowntarget, const doub
 
 
 /*************************************************************************
+Query test problem info
+
+This function is intended for internal use by ALGLIB.
+
+  -- ALGLIB --
+     Copyright 20.07.2021 by Bochkanov Sergey
+*************************************************************************/
+bool lptestproblemhasknowntarget(const lptestproblem &p, const xparams _xparams = alglib::xdefault);
+
+
+/*************************************************************************
+Query test problem info
+
+This function is intended for internal use by ALGLIB.
+
+  -- ALGLIB --
+     Copyright 20.07.2021 by Bochkanov Sergey
+*************************************************************************/
+double lptestproblemgettargetf(const lptestproblem &p, const xparams _xparams = alglib::xdefault);
+
+
+/*************************************************************************
+Query test problem info
+
+This function is intended for internal use by ALGLIB.
+
+  -- ALGLIB --
+     Copyright 20.07.2021 by Bochkanov Sergey
+*************************************************************************/
+ae_int_t lptestproblemgetn(const lptestproblem &p, const xparams _xparams = alglib::xdefault);
+
+
+/*************************************************************************
+Query test problem info
+
+This function is intended for internal use by ALGLIB.
+
+  -- ALGLIB --
+     Copyright 20.07.2021 by Bochkanov Sergey
+*************************************************************************/
+ae_int_t lptestproblemgetm(const lptestproblem &p, const xparams _xparams = alglib::xdefault);
+
+
+/*************************************************************************
 Set scale for test LP problem
 
 This function is intended for internal use by ALGLIB.
@@ -12207,6 +12263,10 @@ void _vipmvars_init(void* _p, ae_state *_state, ae_bool make_automatic);
 void _vipmvars_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_automatic);
 void _vipmvars_clear(void* _p);
 void _vipmvars_destroy(void* _p);
+void _vipmreducedsparsesystem_init(void* _p, ae_state *_state, ae_bool make_automatic);
+void _vipmreducedsparsesystem_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_automatic);
+void _vipmreducedsparsesystem_clear(void* _p);
+void _vipmreducedsparsesystem_destroy(void* _p);
 void _vipmrighthandside_init(void* _p, ae_state *_state, ae_bool make_automatic);
 void _vipmrighthandside_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_automatic);
 void _vipmrighthandside_clear(void* _p);
@@ -13050,6 +13110,10 @@ void lptestproblemcreate(ae_int_t n,
      double targetf,
      lptestproblem* p,
      ae_state *_state);
+ae_bool lptestproblemhasknowntarget(lptestproblem* p, ae_state *_state);
+double lptestproblemgettargetf(lptestproblem* p, ae_state *_state);
+ae_int_t lptestproblemgetn(lptestproblem* p, ae_state *_state);
+ae_int_t lptestproblemgetm(lptestproblem* p, ae_state *_state);
 void lptestproblemsetscale(lptestproblem* p,
      /* Real    */ ae_vector* s,
      ae_state *_state);

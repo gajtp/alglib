@@ -1,5 +1,5 @@
 /*************************************************************************
-ALGLIB 3.18.0 (source code generated 2021-10-25)
+ALGLIB 3.19.0 (source code generated 2022-06-07)
 Copyright (c) Sergey Bochkanov (ALGLIB project).
 
 >>> SOURCE LICENSE >>>
@@ -1927,7 +1927,7 @@ double safeminposrv(double x, double y, double v, ae_state *_state)
     double result;
 
 
-    if( ae_fp_greater_eq(y,(double)(1)) )
+    if( y>=1 )
     {
         
         /*
@@ -1935,7 +1935,7 @@ double safeminposrv(double x, double y, double v, ae_state *_state)
          */
         r = x/y;
         result = v;
-        if( ae_fp_greater(v,r) )
+        if( v>r )
         {
             result = r;
         }
@@ -1950,7 +1950,7 @@ double safeminposrv(double x, double y, double v, ae_state *_state)
         /*
          * Y<1, we can safely multiply by Y
          */
-        if( ae_fp_less(x,v*y) )
+        if( x<v*y )
         {
             result = x/y;
         }
@@ -2369,7 +2369,7 @@ double rmul2(double v0, double v1, ae_state *_state)
 
 /*************************************************************************
 This function returns product of three real numbers. It is convenient when
-you have to perform typecast-and-product of two INTEGERS.
+you have to perform typecast-and-product of three INTEGERS.
 *************************************************************************/
 double rmul3(double v0, double v1, double v2, ae_state *_state)
 {
@@ -2377,6 +2377,20 @@ double rmul3(double v0, double v1, double v2, ae_state *_state)
 
 
     result = v0*v1*v2;
+    return result;
+}
+
+
+/*************************************************************************
+This function returns product of four real numbers. It is convenient when
+you have to perform typecast-and-product of four INTEGERS.
+*************************************************************************/
+double rmul4(double v0, double v1, double v2, double v3, ae_state *_state)
+{
+    double result;
+
+
+    result = v0*v1*v2*v3;
     return result;
 }
 
@@ -3666,7 +3680,32 @@ void tracerownrm1autoprec(/* Real    */ ae_matrix* a,
 
 
 /*************************************************************************
-Outputs vector A[I0,I1-1] to trace log using E8 precision
+Outputs vector A[I0,I1-1] to trace log using E3 precision
+*************************************************************************/
+void tracevectore3(/* Real    */ ae_vector* a,
+     ae_int_t i0,
+     ae_int_t i1,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+
+    ae_trace("[ ");
+    for(i=i0; i<=i1-1; i++)
+    {
+        ae_trace("%11.3e",
+            (double)(a->ptr.p_double[i]));
+        if( i<i1-1 )
+        {
+            ae_trace(" ");
+        }
+    }
+    ae_trace(" ]");
+}
+
+
+/*************************************************************************
+Outputs vector A[I0,I1-1] to trace log using E6 precision
 *************************************************************************/
 void tracevectore6(/* Real    */ ae_vector* a,
      ae_int_t i0,
@@ -4253,6 +4292,142 @@ void raddv(ae_int_t n,
 
 #ifdef ALGLIB_NO_FAST_KERNELS
 /*************************************************************************
+Performs inplace addition of Y[]*Z[] to X[]
+
+INPUT PARAMETERS:
+    N       -   vector length
+    Y       -   array[N], vector to process
+    Z       -   array[N], vector to process
+    X       -   array[N], vector to process
+
+RESULT:
+    X := X + Y*Z
+
+  -- ALGLIB --
+     Copyright 29.10.2021 by Bochkanov Sergey
+*************************************************************************/
+void rmuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+
+    for(i=0; i<=n-1; i++)
+    {
+        x->ptr.p_double[i] = x->ptr.p_double[i]+y->ptr.p_double[i]*z->ptr.p_double[i];
+    }
+}
+#endif
+
+
+#ifdef ALGLIB_NO_FAST_KERNELS
+/*************************************************************************
+Performs inplace subtraction of Y[]*Z[] from X[]
+
+INPUT PARAMETERS:
+    N       -   vector length
+    Y       -   array[N], vector to process
+    Z       -   array[N], vector to process
+    X       -   array[N], vector to process
+
+RESULT:
+    X := X - Y*Z
+
+  -- ALGLIB --
+     Copyright 29.10.2021 by Bochkanov Sergey
+*************************************************************************/
+void rnegmuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+
+    for(i=0; i<=n-1; i++)
+    {
+        x->ptr.p_double[i] = x->ptr.p_double[i]-y->ptr.p_double[i]*z->ptr.p_double[i];
+    }
+}
+#endif
+
+
+#ifdef ALGLIB_NO_FAST_KERNELS
+/*************************************************************************
+Performs addition of Y[]*Z[] to X[], with result being stored to R[]
+
+INPUT PARAMETERS:
+    N       -   vector length
+    Y       -   array[N], vector to process
+    Z       -   array[N], vector to process
+    X       -   array[N], vector to process
+    R       -   array[N], vector to process
+
+RESULT:
+    R := X + Y*Z
+
+  -- ALGLIB --
+     Copyright 29.10.2021 by Bochkanov Sergey
+*************************************************************************/
+void rcopymuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* r,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+
+    for(i=0; i<=n-1; i++)
+    {
+        r->ptr.p_double[i] = x->ptr.p_double[i]+y->ptr.p_double[i]*z->ptr.p_double[i];
+    }
+}
+#endif
+
+
+#ifdef ALGLIB_NO_FAST_KERNELS
+/*************************************************************************
+Performs subtraction of Y[]*Z[] from X[], with result being stored to R[]
+
+INPUT PARAMETERS:
+    N       -   vector length
+    Y       -   array[N], vector to process
+    Z       -   array[N], vector to process
+    X       -   array[N], vector to process
+    R       -   array[N], vector to process
+
+RESULT:
+    R := X - Y*Z
+
+  -- ALGLIB --
+     Copyright 29.10.2021 by Bochkanov Sergey
+*************************************************************************/
+void rcopynegmuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* r,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+
+    for(i=0; i<=n-1; i++)
+    {
+        r->ptr.p_double[i] = x->ptr.p_double[i]-y->ptr.p_double[i]*z->ptr.p_double[i];
+    }
+}
+#endif
+
+
+#ifdef ALGLIB_NO_FAST_KERNELS
+/*************************************************************************
 Performs inplace addition of Y[] to X[]
 
 INPUT PARAMETERS:
@@ -4444,6 +4619,101 @@ void rmergemulrv(ae_int_t n,
     for(i=0; i<=n-1; i++)
     {
         x->ptr.p_double[i] = x->ptr.p_double[i]*y->ptr.pp_double[rowidx][i];
+    }
+}
+#endif
+
+
+#ifdef ALGLIB_NO_FAST_KERNELS
+/*************************************************************************
+Performs componentwise division of vector X[] by vector Y[]
+
+INPUT PARAMETERS:
+    N       -   vector length
+    Y       -   vector to divide by
+    X       -   target vector
+
+RESULT:
+    X := componentwise(X/Y)
+
+  -- ALGLIB --
+     Copyright 20.01.2020 by Bochkanov Sergey
+*************************************************************************/
+void rmergedivv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* x,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+
+    for(i=0; i<=n-1; i++)
+    {
+        x->ptr.p_double[i] = x->ptr.p_double[i]/y->ptr.p_double[i];
+    }
+}
+#endif
+
+
+#ifdef ALGLIB_NO_FAST_KERNELS
+/*************************************************************************
+Performs componentwise division of row X[] by vector Y[]
+
+INPUT PARAMETERS:
+    N       -   vector length
+    Y       -   vector to divide by
+    X       -   target row RowIdx
+
+RESULT:
+    X := componentwise(X/Y)
+
+  -- ALGLIB --
+     Copyright 20.01.2020 by Bochkanov Sergey
+*************************************************************************/
+void rmergedivvr(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_matrix* x,
+     ae_int_t rowidx,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+
+    for(i=0; i<=n-1; i++)
+    {
+        x->ptr.pp_double[rowidx][i] = x->ptr.pp_double[rowidx][i]/y->ptr.p_double[i];
+    }
+}
+#endif
+
+
+#ifdef ALGLIB_NO_FAST_KERNELS
+/*************************************************************************
+Performs componentwise division of row X[] by vector Y[]
+
+INPUT PARAMETERS:
+    N       -   vector length
+    Y       -   vector to divide by
+    X       -   target row RowIdx
+
+RESULT:
+    X := componentwise(X/Y)
+
+  -- ALGLIB --
+     Copyright 20.01.2020 by Bochkanov Sergey
+*************************************************************************/
+void rmergedivrv(ae_int_t n,
+     /* Real    */ ae_matrix* y,
+     ae_int_t rowidx,
+     /* Real    */ ae_vector* x,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+
+    for(i=0; i<=n-1; i++)
+    {
+        x->ptr.p_double[i] = x->ptr.p_double[i]/y->ptr.pp_double[rowidx][i];
     }
 }
 #endif
@@ -4769,6 +5039,63 @@ void rmulr(ae_int_t n,
     for(i=0; i<=n-1; i++)
     {
         x->ptr.pp_double[rowidx][i] = x->ptr.pp_double[rowidx][i]*v;
+    }
+}
+#endif
+
+
+#ifdef ALGLIB_NO_FAST_KERNELS
+/*************************************************************************
+Performs inplace computation of Sqrt(X)
+
+INPUT PARAMETERS:
+    N       -   vector length
+    X       -   array[N], vector to process
+
+OUTPUT PARAMETERS:
+    X       -   elements 0...N-1 replaced by Sqrt(X)
+
+  -- ALGLIB --
+     Copyright 20.01.2020 by Bochkanov Sergey
+*************************************************************************/
+void rsqrtv(ae_int_t n, /* Real    */ ae_vector* x, ae_state *_state)
+{
+    ae_int_t i;
+
+
+    for(i=0; i<=n-1; i++)
+    {
+        x->ptr.p_double[i] = ae_sqrt(x->ptr.p_double[i], _state);
+    }
+}
+#endif
+
+
+#ifdef ALGLIB_NO_FAST_KERNELS
+/*************************************************************************
+Performs inplace computation of Sqrt(X[RowIdx,*])
+
+INPUT PARAMETERS:
+    N       -   vector length
+    X       -   array[?,N], matrix to process
+
+OUTPUT PARAMETERS:
+    X       -   elements 0...N-1 replaced by Sqrt(X)
+
+  -- ALGLIB --
+     Copyright 20.01.2020 by Bochkanov Sergey
+*************************************************************************/
+void rsqrtr(ae_int_t n,
+     /* Real    */ ae_matrix* x,
+     ae_int_t rowidx,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+
+    for(i=0; i<=n-1; i++)
+    {
+        x->ptr.pp_double[rowidx][i] = ae_sqrt(x->ptr.pp_double[rowidx][i], _state);
     }
 }
 #endif
@@ -10654,6 +10981,120 @@ void tagsortmiddleir(/* Integer */ ae_vector* a,
             a->ptr.p_int[p0] = ak;
             b->ptr.p_double[p0] = b->ptr.p_double[p1];
             b->ptr.p_double[p1] = bt;
+            t = k;
+        }
+    }
+}
+
+
+/*************************************************************************
+Sorting function optimized for integer keys and integer labels, can be used
+to sort middle of the array
+
+A is sorted, and same permutations are applied to B.
+
+NOTES:
+    this function assumes that A[] is finite; it doesn't checks that
+    condition. All other conditions (size of input arrays, etc.) are not
+    checked too.
+
+  -- ALGLIB --
+     Copyright 11.12.2008 by Bochkanov Sergey
+*************************************************************************/
+void tagsortmiddleii(/* Integer */ ae_vector* a,
+     /* Integer */ ae_vector* b,
+     ae_int_t offset,
+     ae_int_t n,
+     ae_state *_state)
+{
+    ae_int_t i;
+    ae_int_t k;
+    ae_int_t t;
+    ae_int_t tmp;
+    ae_int_t tmpi;
+    ae_int_t p0;
+    ae_int_t p1;
+    ae_int_t at;
+    ae_int_t ak;
+    ae_int_t ak1;
+    ae_int_t bt;
+
+
+    
+    /*
+     * Special cases
+     */
+    if( n<=1 )
+    {
+        return;
+    }
+    
+    /*
+     * General case, N>1: sort, update B
+     */
+    for(i=2; i<=n; i++)
+    {
+        t = i;
+        while(t!=1)
+        {
+            k = t/2;
+            p0 = offset+k-1;
+            p1 = offset+t-1;
+            ak = a->ptr.p_int[p0];
+            at = a->ptr.p_int[p1];
+            if( ak>=at )
+            {
+                break;
+            }
+            a->ptr.p_int[p0] = at;
+            a->ptr.p_int[p1] = ak;
+            tmpi = b->ptr.p_int[p0];
+            b->ptr.p_int[p0] = b->ptr.p_int[p1];
+            b->ptr.p_int[p1] = tmpi;
+            t = k;
+        }
+    }
+    for(i=n-1; i>=1; i--)
+    {
+        p0 = offset+0;
+        p1 = offset+i;
+        tmp = a->ptr.p_int[p1];
+        a->ptr.p_int[p1] = a->ptr.p_int[p0];
+        a->ptr.p_int[p0] = tmp;
+        at = tmp;
+        tmpi = b->ptr.p_int[p1];
+        b->ptr.p_int[p1] = b->ptr.p_int[p0];
+        b->ptr.p_int[p0] = tmpi;
+        bt = tmpi;
+        t = 0;
+        for(;;)
+        {
+            k = 2*t+1;
+            if( k+1>i )
+            {
+                break;
+            }
+            p0 = offset+t;
+            p1 = offset+k;
+            ak = a->ptr.p_int[p1];
+            if( k+1<i )
+            {
+                ak1 = a->ptr.p_int[p1+1];
+                if( ak1>ak )
+                {
+                    ak = ak1;
+                    p1 = p1+1;
+                    k = k+1;
+                }
+            }
+            if( at>=ak )
+            {
+                break;
+            }
+            a->ptr.p_int[p1] = at;
+            a->ptr.p_int[p0] = ak;
+            b->ptr.p_int[p0] = b->ptr.p_int[p1];
+            b->ptr.p_int[p1] = bt;
             t = k;
         }
     }

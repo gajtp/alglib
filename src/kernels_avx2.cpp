@@ -1,5 +1,5 @@
 /*************************************************************************
-ALGLIB 3.18.0 (source code generated 2021-10-25)
+ALGLIB 3.19.0 (source code generated 2022-06-07)
 Copyright (c) Sergey Bochkanov (ALGLIB project).
 
 >>> SOURCE LICENSE >>>
@@ -421,6 +421,19 @@ void rmulv_avx2(const ae_int_t n, const double v, double* __restrict x,
     }
 }
 
+void rsqrtv_avx2(const ae_int_t n, double* __restrict x, const ae_state* __restrict _state)
+{
+    ae_int_t i;
+    
+    const ae_int_t avx2len = n>>2;
+    const ae_int_t tail = avx2len<<2;
+    __m256d* __restrict pDest = (__m256d*)(x);
+    for(i=0; i<avx2len; i++)
+        pDest[i] = _mm256_sqrt_pd(pDest[i]);
+    for(i=tail; i<n; i++)
+        x[i] = sqrt(x[i]);
+}
+
 void rmulvx_avx2(const ae_int_t n, const double v, double* __restrict x,
     const ae_state* __restrict _state)
 {
@@ -566,6 +579,35 @@ void rmergemulv_avx2(ae_int_t n,
     case 3: {
         *(__m128d*)(pDest+i) = _mm_mul_pd(*(const __m128d*)(pSrc+i), *(const __m128d*)(pDest+i));
         ((double*)(pDest+i))[2] *= ((const double*)(pSrc+i))[2];
+        break;
+    }
+    }
+}
+
+void rmergedivv_avx2(ae_int_t n,
+     /* Real    */ const double* __restrict y,
+     /* Real    */ double* __restrict x,
+     const ae_state* __restrict _state)
+{
+    ae_int_t i;
+
+    const ae_int_t avx2len = n>>2;
+    const __m256d* __restrict pSrc = (const __m256d*)(y);
+    __m256d* __restrict pDest = (__m256d*)(x);
+    for(i=0; i<avx2len; i++) {
+        pDest[i] = _mm256_div_pd(pDest[i], pSrc[i]);
+    }
+    const ae_int_t tail = avx2len<<2;
+    switch(n-tail) {
+    case 1:
+        *(double*)(pDest+i) = (*(const double*)(pDest+i)) / (*(const double*)(pSrc+i));
+        break;
+    case 2:
+        *(__m128d*)(pDest+i) = _mm_div_pd(*(const __m128d*)(pDest+i),  *(const __m128d*)(pSrc+i));
+        break;
+    case 3: {
+        *(__m128d*)(pDest+i) = _mm_div_pd(*(const __m128d*)(pDest+i), *(const __m128d*)(pSrc+i));
+        ((double*)(pDest+i))[2] /= ((const double*)(pSrc+i))[2];
         break;
     }
     }

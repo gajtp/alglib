@@ -1,5 +1,5 @@
 /*************************************************************************
-ALGLIB 3.18.0 (source code generated 2021-10-25)
+ALGLIB 3.19.0 (source code generated 2022-06-07)
 Copyright (c) Sergey Bochkanov (ALGLIB project).
 
 >>> SOURCE LICENSE >>>
@@ -18446,6 +18446,126 @@ void lptestproblemcreate(const ae_int_t n, const bool hasknowntarget, const doub
 }
 
 /*************************************************************************
+Query test problem info
+
+This function is intended for internal use by ALGLIB.
+
+  -- ALGLIB --
+     Copyright 20.07.2021 by Bochkanov Sergey
+*************************************************************************/
+bool lptestproblemhasknowntarget(const lptestproblem &p, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return 0;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    ae_bool result = alglib_impl::lptestproblemhasknowntarget(const_cast<alglib_impl::lptestproblem*>(p.c_ptr()), &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return *(reinterpret_cast<bool*>(&result));
+}
+
+/*************************************************************************
+Query test problem info
+
+This function is intended for internal use by ALGLIB.
+
+  -- ALGLIB --
+     Copyright 20.07.2021 by Bochkanov Sergey
+*************************************************************************/
+double lptestproblemgettargetf(const lptestproblem &p, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return 0;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    double result = alglib_impl::lptestproblemgettargetf(const_cast<alglib_impl::lptestproblem*>(p.c_ptr()), &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return *(reinterpret_cast<double*>(&result));
+}
+
+/*************************************************************************
+Query test problem info
+
+This function is intended for internal use by ALGLIB.
+
+  -- ALGLIB --
+     Copyright 20.07.2021 by Bochkanov Sergey
+*************************************************************************/
+ae_int_t lptestproblemgetn(const lptestproblem &p, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return 0;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::ae_int_t result = alglib_impl::lptestproblemgetn(const_cast<alglib_impl::lptestproblem*>(p.c_ptr()), &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return *(reinterpret_cast<ae_int_t*>(&result));
+}
+
+/*************************************************************************
+Query test problem info
+
+This function is intended for internal use by ALGLIB.
+
+  -- ALGLIB --
+     Copyright 20.07.2021 by Bochkanov Sergey
+*************************************************************************/
+ae_int_t lptestproblemgetm(const lptestproblem &p, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return 0;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::ae_int_t result = alglib_impl::lptestproblemgetm(const_cast<alglib_impl::lptestproblem*>(p.c_ptr()), &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return *(reinterpret_cast<ae_int_t*>(&result));
+}
+
+/*************************************************************************
 Set scale for test LP problem
 
 This function is intended for internal use by ALGLIB.
@@ -18894,6 +19014,7 @@ static void minbleic_updateestimateofgoodstep(double* estimate,
 
 #endif
 #if defined(AE_COMPILE_VIPMSOLVER) || !defined(AE_PARTIAL_BUILD)
+static double vipmsolver_muquasidense = 2.0;
 static ae_int_t vipmsolver_maxipmits = 200;
 static double vipmsolver_initslackval = 100.0;
 static double vipmsolver_steplengthdecay = 0.95;
@@ -18927,7 +19048,22 @@ static void vipmsolver_varsaddstep(vipmvars* vstate,
      ae_state *_state);
 static double vipmsolver_varscomputecomplementaritygap(vipmvars* vstate,
      ae_state *_state);
-static double vipmsolver_varscomputemu(vipmvars* vstate, ae_state *_state);
+static double vipmsolver_varscomputemu(vipmstate* state,
+     vipmvars* vstate,
+     ae_state *_state);
+static void vipmsolver_reducedsysteminit(vipmreducedsparsesystem* s,
+     vipmstate* solver,
+     ae_state *_state);
+static ae_bool vipmsolver_reducedsystemfactorizewithaddend(vipmreducedsparsesystem* s,
+     /* Real    */ ae_vector* d,
+     double modeps,
+     double badchol,
+     double* sumsq,
+     double* errsq,
+     ae_state *_state);
+static void vipmsolver_reducedsystemsolve(vipmreducedsparsesystem* s,
+     /* Real    */ ae_vector* b,
+     ae_state *_state);
 static void vipmsolver_vipminit(vipmstate* state,
      /* Real    */ ae_vector* s,
      /* Real    */ ae_vector* xorigin,
@@ -19587,8 +19723,10 @@ static double nlcslp_slpstpclosetoone = 0.95;
 static double nlcslp_maxtrustraddecay = 0.1;
 static double nlcslp_maxtrustradgrowth = 1.333;
 static double nlcslp_slpgtol = 0.4;
-static double nlcslp_bigc = 500.0;
+static double nlcslp_initbigc = 500.0;
+static double nlcslp_maxbigc = 1.0E5;
 static double nlcslp_bfgstol = 1.0E-5;
+static double nlcslp_defaultl1penalty = 0.1;
 static double nlcslp_meritfunctionbase = 0.0;
 static double nlcslp_meritfunctiongain = 2.0;
 static double nlcslp_inequalitydampingfactor = 10.0;
@@ -19601,6 +19739,7 @@ static ae_int_t nlcslp_nondescentlimit = 99999;
 static ae_int_t nlcslp_nonmonotonicphase2limit = 5;
 static double nlcslp_slpbigscale = 5.0;
 static double nlcslp_slpsmallscale = 0.2;
+static double nlcslp_defaultmaglagdecay = 0.85;
 static void nlcslp_initlpsubsolver(minslpstate* sstate,
      minslpsubsolver* subsolver,
      ae_int_t hessiantype,
@@ -19645,6 +19784,7 @@ static ae_bool nlcslp_phase13iteration(minslpstate* state,
      /* Real    */ ae_matrix* curj,
      /* Real    */ ae_vector* lagmult,
      ae_int_t* status,
+     double* dnrm,
      double* stp,
      ae_state *_state);
 static void nlcslp_phase2init(minslpphase2state* state2,
@@ -40973,6 +41113,7 @@ void vipmsetquadraticlinear(vipmstate* state,
         ae_assert(ae_isfinite(vv, _state), "VIPMSetQuadraticLinear: DenseH contains infinite or NaN values!", _state);
         scaledenseqpinplace(&state->denseh, ae_false, nmain, &state->c, n, &state->scl, _state);
         state->targetscale = normalizedenseqpinplace(&state->denseh, ae_false, nmain, &state->c, n, _state);
+        state->isdiagonalh = ae_false;
     }
     if( state->factorizationtype==1 )
     {
@@ -40980,7 +41121,7 @@ void vipmsetquadraticlinear(vipmstate* state,
         
         /*
          * Quadratic term is stored in sparse format: either sparsify dense
-         * term of copy sparse one
+         * term or copy the sparse one
          */
         state->hkind = 1;
         state->sparseh.matrixtype = 1;
@@ -41159,6 +41300,7 @@ void vipmsetquadraticlinear(vipmstate* state,
         }
         scalesparseqpinplace(&state->scl, n, &state->sparseh, &state->c, _state);
         state->targetscale = normalizesparseqpinplace(&state->sparseh, ae_false, &state->c, n, _state);
+        state->isdiagonalh = state->sparseh.ridx.ptr.p_int[n]==n;
     }
     ae_assert(state->hkind>=0, "VIPMSetQuadraticLinear: integrity check failed", _state);
 }
@@ -41657,9 +41799,10 @@ void vipmoptimize(vipmstate* state,
     mustop = (100+ae_sqrt((double)(n), _state))*ae_machineepsilon;
     mumin = 0.01*mustop;
     vipmsolver_vipmpowerup(state, regfree, _state);
-    vipmsolver_varsinitfrom(&state->x0, &state->current, _state);
     vipmsolver_varsinitfrom(&state->best, &state->current, _state);
     vipmsolver_varsinitbyzero(&state->zerovars, n, m, _state);
+    vipmsolver_varsinitbyzero(&state->deltaaff, n, m, _state);
+    vipmsolver_varsinitbyzero(&state->deltacorr, n, m, _state);
     bestiteridx = -1;
     besterr = ae_maxrealnumber;
     bestegap = ae_maxrealnumber;
@@ -41684,7 +41827,6 @@ void vipmoptimize(vipmstate* state,
     errd2 = ae_maxrealnumber;
     for(iteridx=0; iteridx<=vipmsolver_maxipmits-1; iteridx++)
     {
-        vipmsolver_varsinitfrom(&state->x0, &state->current, _state);
         
         /*
          * Trace beginning
@@ -41734,12 +41876,11 @@ void vipmoptimize(vipmstate* state,
         /*
          * Compute Mu
          */
-        mu = vipmsolver_varscomputemu(&state->current, _state);
+        mu = vipmsolver_varscomputemu(state, &state->current, _state);
         
         /*
          * Compute affine scaling step for Mehrotra's predictor-corrector algorithm
          */
-        vipmsolver_varsinitbyzero(&state->deltaaff, n, m, _state);
         if( !vipmsolver_vipmcomputestepdirection(state, &state->current, 0.0, &state->zerovars, &state->deltaaff, regeps, ae_fp_greater_eq(dampeps,safedampeps), _state) )
         {
             
@@ -41763,14 +41904,13 @@ void vipmoptimize(vipmstate* state,
          */
         vipmsolver_varsinitfrom(&state->trial, &state->current, _state);
         vipmsolver_varsaddstep(&state->trial, &state->deltaaff, alphaaffp, alphaaffd, _state);
-        muaff = vipmsolver_varscomputemu(&state->trial, _state);
+        muaff = vipmsolver_varscomputemu(state, &state->trial, _state);
         sigma = ae_minreal(ae_pow((muaff+mumin)/(mu+mumin), (double)(3), _state), 1.0, _state);
         ae_assert(ae_isfinite(sigma, _state)&&ae_fp_less_eq(sigma,(double)(1)), "VIPMOptimize: critical integrity check failed for Sigma (infinite or greater than 1)", _state);
         
         /*
          * Compute corrector step
          */
-        vipmsolver_varsinitbyzero(&state->deltacorr, n, m, _state);
         if( !vipmsolver_vipmcomputestepdirection(state, &state->current, sigma*mu+mumin, &state->deltaaff, &state->deltacorr, regeps, ae_fp_greater_eq(dampeps,safedampeps), _state) )
         {
             
@@ -41856,6 +41996,7 @@ void vipmoptimize(vipmstate* state,
                         state->hasgz.ptr.p_bool[i] = ae_false;
                         state->current.g.ptr.p_double[i] = (double)(0);
                         state->current.z.ptr.p_double[i] = (double)(0);
+                        state->cntgz = state->cntgz-1;
                         inc(&droppedbounds, _state);
                     }
                     if( (state->hasbndu.ptr.p_bool[i]&&state->hasts.ptr.p_bool[i])&&ae_fp_greater(ae_fabs(state->bndu.ptr.p_double[i], _state),vipmsolver_bigconstrmag*primalxscale) )
@@ -41863,6 +42004,7 @@ void vipmoptimize(vipmstate* state,
                         state->hasts.ptr.p_bool[i] = ae_false;
                         state->current.t.ptr.p_double[i] = (double)(0);
                         state->current.s.ptr.p_double[i] = (double)(0);
+                        state->cntts = state->cntts-1;
                         inc(&droppedbounds, _state);
                     }
                 }
@@ -41889,6 +42031,7 @@ void vipmoptimize(vipmstate* state,
                         state->haspq.ptr.p_bool[i] = ae_false;
                         state->current.p.ptr.p_double[i] = (double)(0);
                         state->current.q.ptr.p_double[i] = (double)(0);
+                        state->cntpq = state->cntpq-1;
                         inc(&droppedbounds, _state);
                     }
                 }
@@ -41916,7 +42059,7 @@ void vipmoptimize(vipmstate* state,
         preverrp2 = errp2;
         preverrd2 = errd2;
         vipmsolver_computeerrors(state, &errp2, &errd2, &errpinf, &errdinf, &errgap, _state);
-        mu = vipmsolver_varscomputemu(&state->current, _state);
+        mu = vipmsolver_varscomputemu(state, &state->current, _state);
         egap = errgap;
         eprimal = errpinf;
         edual = errdinf;
@@ -42164,7 +42307,6 @@ static void vipmsolver_varsinitfrom(vipmvars* vstate,
      vipmvars* vsrc,
      ae_state *_state)
 {
-    ae_int_t i;
     ae_int_t n;
     ae_int_t m;
 
@@ -42175,32 +42317,16 @@ static void vipmsolver_varsinitfrom(vipmvars* vstate,
     ae_assert(m>=0, "VarsInitFrom: M<0", _state);
     vstate->n = n;
     vstate->m = m;
-    rvectorsetlengthatleast(&vstate->x, n, _state);
-    rvectorsetlengthatleast(&vstate->g, n, _state);
-    rvectorsetlengthatleast(&vstate->t, n, _state);
-    rvectorsetlengthatleast(&vstate->w, m, _state);
-    rvectorsetlengthatleast(&vstate->p, m, _state);
-    rvectorsetlengthatleast(&vstate->z, n, _state);
-    rvectorsetlengthatleast(&vstate->s, n, _state);
-    rvectorsetlengthatleast(&vstate->y, m, _state);
-    rvectorsetlengthatleast(&vstate->v, m, _state);
-    rvectorsetlengthatleast(&vstate->q, m, _state);
-    for(i=0; i<=n-1; i++)
-    {
-        vstate->x.ptr.p_double[i] = vsrc->x.ptr.p_double[i];
-        vstate->g.ptr.p_double[i] = vsrc->g.ptr.p_double[i];
-        vstate->t.ptr.p_double[i] = vsrc->t.ptr.p_double[i];
-        vstate->z.ptr.p_double[i] = vsrc->z.ptr.p_double[i];
-        vstate->s.ptr.p_double[i] = vsrc->s.ptr.p_double[i];
-    }
-    for(i=0; i<=m-1; i++)
-    {
-        vstate->w.ptr.p_double[i] = vsrc->w.ptr.p_double[i];
-        vstate->p.ptr.p_double[i] = vsrc->p.ptr.p_double[i];
-        vstate->y.ptr.p_double[i] = vsrc->y.ptr.p_double[i];
-        vstate->v.ptr.p_double[i] = vsrc->v.ptr.p_double[i];
-        vstate->q.ptr.p_double[i] = vsrc->q.ptr.p_double[i];
-    }
+    rcopyallocv(n, &vsrc->x, &vstate->x, _state);
+    rcopyallocv(n, &vsrc->g, &vstate->g, _state);
+    rcopyallocv(n, &vsrc->t, &vstate->t, _state);
+    rcopyallocv(n, &vsrc->z, &vstate->z, _state);
+    rcopyallocv(n, &vsrc->s, &vstate->s, _state);
+    rcopyallocv(m, &vsrc->y, &vstate->y, _state);
+    rcopyallocv(m, &vsrc->w, &vstate->w, _state);
+    rcopyallocv(m, &vsrc->p, &vstate->p, _state);
+    rcopyallocv(m, &vsrc->v, &vstate->v, _state);
+    rcopyallocv(m, &vsrc->q, &vstate->q, _state);
 }
 
 
@@ -42283,41 +42409,283 @@ Computes empirical value of the barrier parameter Mu
   -- ALGLIB --
      Copyright 01.11.2019 by Bochkanov Sergey
 *************************************************************************/
-static double vipmsolver_varscomputemu(vipmvars* vstate, ae_state *_state)
+static double vipmsolver_varscomputemu(vipmstate* state,
+     vipmvars* vstate,
+     ae_state *_state)
 {
-    ae_int_t i;
-    ae_int_t k;
     double result;
 
 
-    k = 0;
     result = (double)(0);
-    for(i=0; i<=vstate->n-1; i++)
-    {
-        result = result+vstate->z.ptr.p_double[i]*vstate->g.ptr.p_double[i]+vstate->s.ptr.p_double[i]*vstate->t.ptr.p_double[i];
-        if( !(vstate->z.ptr.p_double[i]*vstate->g.ptr.p_double[i]==0.0) )
-        {
-            k = k+1;
-        }
-        if( !(vstate->s.ptr.p_double[i]*vstate->t.ptr.p_double[i]==0.0) )
-        {
-            k = k+1;
-        }
-    }
-    for(i=0; i<=vstate->m-1; i++)
-    {
-        result = result+vstate->v.ptr.p_double[i]*vstate->w.ptr.p_double[i]+vstate->p.ptr.p_double[i]*vstate->q.ptr.p_double[i];
-        if( !(vstate->v.ptr.p_double[i]*vstate->w.ptr.p_double[i]==0.0) )
-        {
-            k = k+1;
-        }
-        if( !(vstate->p.ptr.p_double[i]*vstate->q.ptr.p_double[i]==0.0) )
-        {
-            k = k+1;
-        }
-    }
-    result = result/coalesce((double)(k), (double)(1), _state);
+    result = result+rdotv(vstate->n, &vstate->z, &vstate->g, _state)+rdotv(vstate->n, &vstate->s, &vstate->t, _state);
+    result = result+rdotv(vstate->m, &vstate->v, &vstate->w, _state)+rdotv(vstate->m, &vstate->p, &vstate->q, _state);
+    result = result/coalesce((double)(state->cntgz+state->cntts+state->cntwv+state->cntpq), (double)(1), _state);
     return result;
+}
+
+
+/*************************************************************************
+Initializes reduced sparse system.
+
+Works only for sparse IPM.
+
+  -- ALGLIB --
+     Copyright 15.11.2021 by Bochkanov Sergey
+*************************************************************************/
+static void vipmsolver_reducedsysteminit(vipmreducedsparsesystem* s,
+     vipmstate* solver,
+     ae_state *_state)
+{
+    ae_int_t ntotal;
+    ae_int_t nnzmax;
+    ae_int_t factldlt;
+    ae_int_t permpriorityamd;
+    ae_int_t offs;
+    ae_int_t rowoffs;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    ae_int_t k0;
+    ae_int_t k1;
+    ae_int_t sumdeg;
+    ae_int_t colthreshold;
+    ae_int_t rowthreshold;
+    ae_int_t eligiblecols;
+    ae_int_t eligiblerows;
+
+
+    ae_assert(solver->factorizationtype==1, "ReducedSystemInit: unexpected factorization type", _state);
+    ae_assert(solver->hkind==1, "ReducedSystemInit: unexpected HKind", _state);
+    ntotal = solver->n+solver->mdense+solver->msparse;
+    s->ntotal = ntotal;
+    rallocv(ntotal, &s->effectivediag, _state);
+    
+    /*
+     * Determine maximum amount of memory required to store sparse matrices
+     */
+    nnzmax = solver->sparseh.ridx.ptr.p_int[solver->n];
+    if( solver->msparse>0 )
+    {
+        nnzmax = nnzmax+solver->sparseafull.ridx.ptr.p_int[solver->msparse];
+    }
+    if( solver->mdense>0 )
+    {
+        nnzmax = nnzmax+solver->n*solver->mdense;
+    }
+    nnzmax = nnzmax+ntotal;
+    
+    /*
+     * Prepare strictly lower triangle of template KKT matrix (KKT system without D and E
+     * terms being added to diagonals)
+     */
+    s->rawsystem.m = ntotal;
+    s->rawsystem.n = ntotal;
+    ivectorsetlengthatleast(&s->rawsystem.idx, nnzmax, _state);
+    rvectorsetlengthatleast(&s->rawsystem.vals, nnzmax, _state);
+    ivectorsetlengthatleast(&s->rawsystem.ridx, ntotal+1, _state);
+    s->rawsystem.ridx.ptr.p_int[0] = 0;
+    offs = 0;
+    rowoffs = 0;
+    sumdeg = 0;
+    isetallocv(solver->n, 0, &s->coldegrees, _state);
+    isetallocv(solver->msparse+solver->mdense, 0, &s->rowdegrees, _state);
+    bsetallocv(solver->n, ae_true, &s->isdiagonal, _state);
+    for(i=0; i<=solver->n-1; i++)
+    {
+        ae_assert(solver->sparseh.didx.ptr.p_int[i]+1==solver->sparseh.uidx.ptr.p_int[i], "ReducedSystemInit: critical integrity check failed for diagonal of H", _state);
+        if( !solver->isfrozen.ptr.p_bool[i] )
+        {
+            
+            /*
+             * Entire row is not frozen, but some of its entries can be.
+             * Output non-frozen offdiagonal entries.
+             */
+            k0 = solver->sparseh.ridx.ptr.p_int[i];
+            k1 = solver->sparseh.didx.ptr.p_int[i]-1;
+            for(k=k0; k<=k1; k++)
+            {
+                j = solver->sparseh.idx.ptr.p_int[k];
+                if( !solver->isfrozen.ptr.p_bool[j] )
+                {
+                    s->rawsystem.idx.ptr.p_int[offs] = j;
+                    s->rawsystem.vals.ptr.p_double[offs] = -solver->sparseh.vals.ptr.p_double[k];
+                    s->isdiagonal.ptr.p_bool[i] = ae_false;
+                    s->isdiagonal.ptr.p_bool[j] = ae_false;
+                    offs = offs+1;
+                }
+            }
+            
+            /*
+             * Output diagonal entry (it is always not frozen)
+             */
+            s->rawsystem.idx.ptr.p_int[offs] = i;
+            s->rawsystem.vals.ptr.p_double[offs] = -solver->sparseh.vals.ptr.p_double[solver->sparseh.didx.ptr.p_int[i]];
+            offs = offs+1;
+        }
+        else
+        {
+            
+            /*
+             * Entire row is frozen, output just -1
+             */
+            s->rawsystem.idx.ptr.p_int[offs] = i;
+            s->rawsystem.vals.ptr.p_double[offs] = -1.0;
+            offs = offs+1;
+        }
+        rowoffs = rowoffs+1;
+        s->rawsystem.ridx.ptr.p_int[rowoffs] = offs;
+    }
+    for(i=0; i<=solver->msparse-1; i++)
+    {
+        k0 = solver->sparseafull.ridx.ptr.p_int[i];
+        k1 = solver->sparseafull.ridx.ptr.p_int[i+1]-1;
+        for(k=k0; k<=k1; k++)
+        {
+            j = solver->sparseafull.idx.ptr.p_int[k];
+            if( !solver->isfrozen.ptr.p_bool[j] )
+            {
+                s->rawsystem.idx.ptr.p_int[offs] = j;
+                s->rawsystem.vals.ptr.p_double[offs] = solver->sparseafull.vals.ptr.p_double[k];
+                s->rowdegrees.ptr.p_int[i] = s->rowdegrees.ptr.p_int[i]+1;
+                s->coldegrees.ptr.p_int[j] = s->coldegrees.ptr.p_int[j]+1;
+                sumdeg = sumdeg+1;
+                offs = offs+1;
+            }
+        }
+        s->rawsystem.idx.ptr.p_int[offs] = rowoffs;
+        s->rawsystem.vals.ptr.p_double[offs] = 0.0;
+        offs = offs+1;
+        rowoffs = rowoffs+1;
+        s->rawsystem.ridx.ptr.p_int[rowoffs] = offs;
+    }
+    for(i=0; i<=solver->mdense-1; i++)
+    {
+        for(k=0; k<=solver->n-1; k++)
+        {
+            if( solver->denseafull.ptr.pp_double[i][k]!=0.0&&!solver->isfrozen.ptr.p_bool[k] )
+            {
+                s->rawsystem.idx.ptr.p_int[offs] = k;
+                s->rawsystem.vals.ptr.p_double[offs] = solver->denseafull.ptr.pp_double[i][k];
+                s->rowdegrees.ptr.p_int[solver->msparse+i] = s->rowdegrees.ptr.p_int[solver->msparse+i]+1;
+                s->coldegrees.ptr.p_int[k] = s->coldegrees.ptr.p_int[k]+1;
+                sumdeg = sumdeg+1;
+                offs = offs+1;
+            }
+        }
+        s->rawsystem.idx.ptr.p_int[offs] = rowoffs;
+        s->rawsystem.vals.ptr.p_double[offs] = 0.0;
+        offs = offs+1;
+        rowoffs = rowoffs+1;
+        s->rawsystem.ridx.ptr.p_int[rowoffs] = offs;
+    }
+    ae_assert(rowoffs==ntotal, "ReducedSystemInit: critical integrity check failed", _state);
+    ae_assert(offs<=nnzmax, "ReducedSystemInit: critical integrity check failed", _state);
+    sparsecreatecrsinplace(&s->rawsystem, _state);
+    
+    /*
+     * Prepare reordering
+     */
+    colthreshold = ae_round(vipmsolver_muquasidense*sumdeg/solver->n, _state)+2;
+    rowthreshold = ae_round(vipmsolver_muquasidense*sumdeg/(solver->msparse+solver->mdense+1), _state)+2;
+    eligiblecols = 0;
+    eligiblerows = 0;
+    isetallocv(ntotal, 0, &s->priorities, _state);
+    for(i=0; i<=solver->n-1; i++)
+    {
+        if( s->isdiagonal.ptr.p_bool[i]&&s->coldegrees.ptr.p_int[i]<=colthreshold )
+        {
+            eligiblecols = eligiblecols+1;
+        }
+    }
+    for(i=0; i<=solver->mdense+solver->msparse-1; i++)
+    {
+        if( s->rowdegrees.ptr.p_int[i]<=rowthreshold )
+        {
+            eligiblerows = eligiblerows+1;
+        }
+    }
+    if( solver->dotrace )
+    {
+        ae_trace("> initializing KKT system; no priority ordering being applied\n");
+    }
+    
+    /*
+     * Perform factorization analysis using sparsity pattern (but not numerical values)
+     */
+    factldlt = 1;
+    permpriorityamd = 3;
+    if( !spsymmanalyze(&s->rawsystem, &s->priorities, factldlt, permpriorityamd, &s->analysis, _state) )
+    {
+        ae_assert(ae_false, "ReducedSystemInit: critical integrity check failed, symbolically degenerate KKT system encountered", _state);
+    }
+}
+
+
+/*************************************************************************
+Computes factorization of A+D, where A is  internally  stored  KKT  matrix
+and D is user-supplied diagonal term. The factorization is stored internally
+and should never be accessed directly.
+
+ModEps and BadChol are user supplied tolerances for modified Cholesky/LDLT.
+
+Returns True on success, False on LDLT failure.
+
+On success outputs diagonal reproduction error ErrSq, and sum of squared
+diagonal elements SumSq
+
+  -- ALGLIB --
+     Copyright 15.11.2021 by Bochkanov Sergey
+*************************************************************************/
+static ae_bool vipmsolver_reducedsystemfactorizewithaddend(vipmreducedsparsesystem* s,
+     /* Real    */ ae_vector* d,
+     double modeps,
+     double badchol,
+     double* sumsq,
+     double* errsq,
+     ae_state *_state)
+{
+    ae_int_t ntotal;
+    ae_int_t i;
+    ae_bool result;
+
+    *sumsq = 0;
+    *errsq = 0;
+
+    ntotal = s->ntotal;
+    for(i=0; i<=ntotal-1; i++)
+    {
+        s->effectivediag.ptr.p_double[i] = s->rawsystem.vals.ptr.p_double[s->rawsystem.didx.ptr.p_int[i]]+d->ptr.p_double[i];
+    }
+    spsymmreloaddiagonal(&s->analysis, &s->effectivediag, _state);
+    result = ae_true;
+    spsymmsetmodificationstrategy(&s->analysis, 1, modeps, badchol, 0.0, 0.0, _state);
+    if( spsymmfactorize(&s->analysis, _state) )
+    {
+        spsymmdiagerr(&s->analysis, sumsq, errsq, _state);
+    }
+    else
+    {
+        *sumsq = (double)(0);
+        *errsq = (double)(0);
+        result = ae_false;
+    }
+    return result;
+}
+
+
+/*************************************************************************
+Solve reduced KKT system, replacing right part by its solution.
+
+  -- ALGLIB --
+     Copyright 15.11.2021 by Bochkanov Sergey
+*************************************************************************/
+static void vipmsolver_reducedsystemsolve(vipmreducedsparsesystem* s,
+     /* Real    */ ae_vector* b,
+     ae_state *_state)
+{
+
+
+    spsymmsolve(&s->analysis, b, _state);
 }
 
 
@@ -42433,6 +42801,7 @@ static void vipmsolver_vipminit(vipmstate* state,
             }
         }
         state->hkind = 0;
+        state->isdiagonalh = ae_false;
     }
     if( ftype==1 )
     {
@@ -42456,6 +42825,7 @@ static void vipmsolver_vipminit(vipmstate* state,
         state->sparseh.ridx.ptr.p_int[n] = n;
         sparsecreatecrsinplace(&state->sparseh, _state);
         state->hkind = 1;
+        state->isdiagonalh = ae_true;
     }
     ae_assert(state->hkind>=0, "VIPMInit: integrity check failed", _state);
     
@@ -42690,15 +43060,36 @@ static void vipmsolver_multiplyhx(vipmstate* state,
         {
             hx->ptr.p_double[i] = (double)(0);
         }
+        for(i=0; i<=n-1; i++)
+        {
+            hx->ptr.p_double[i] = hx->ptr.p_double[i]+x->ptr.p_double[i]*state->diagr.ptr.p_double[i];
+        }
     }
     if( state->hkind==1 )
     {
         ae_assert(state->sparseh.n==n&&state->sparseh.m==n, "VIPMMultiplyHX: sparse H has incorrect size", _state);
-        sparsesmv(&state->sparseh, ae_false, x, hx, _state);
-    }
-    for(i=0; i<=n-1; i++)
-    {
-        hx->ptr.p_double[i] = hx->ptr.p_double[i]+x->ptr.p_double[i]*state->diagr.ptr.p_double[i];
+        if( state->isdiagonalh )
+        {
+            
+            /*
+             * H is known to be diagonal, much faster code can be used
+             */
+            rcopyv(n, &state->diagr, hx, _state);
+            raddv(n, 1.0, &state->sparseh.vals, hx, _state);
+            rmergemulv(n, x, hx, _state);
+        }
+        else
+        {
+            
+            /*
+             * H is a general sparse matrix, use generic sparse matrix-vector multiply
+             */
+            sparsesmv(&state->sparseh, ae_false, x, hx, _state);
+            for(i=0; i<=n-1; i++)
+            {
+                hx->ptr.p_double[i] = hx->ptr.p_double[i]+x->ptr.p_double[i]*state->diagr.ptr.p_double[i];
+            }
+        }
     }
 }
 
@@ -42743,23 +43134,14 @@ static void vipmsolver_vipmpowerup(vipmstate* state,
 {
     ae_int_t n;
     ae_int_t m;
-    ae_int_t nnzmax;
-    ae_int_t offs;
-    ae_int_t rowoffs;
     ae_int_t i;
-    ae_int_t j;
-    ae_int_t k;
-    ae_int_t k0;
-    ae_int_t k1;
     double v;
     double vrhs;
-    ae_int_t factldlt;
-    ae_int_t permauto;
-    double maxinitialnoncentrality;
-    double maxinitialimbalance;
     double priorcoeff;
     double initprimslack;
     double initdualslack;
+    double maxinitialnoncentrality;
+    double maxinitialimbalance;
     double mu0;
     double mumin;
     ae_bool success;
@@ -42803,125 +43185,39 @@ static void vipmsolver_vipmpowerup(vipmstate* state,
         state->haswv.ptr.p_bool[i] = (state->slacksforequalityconstraints||!state->hasr.ptr.p_bool[i])||ae_fp_greater(state->r.ptr.p_double[i],(double)(0));
         state->haspq.ptr.p_bool[i] = state->hasr.ptr.p_bool[i]&&state->haswv.ptr.p_bool[i];
     }
+    state->cntgz = 0;
+    state->cntts = 0;
+    state->cntwv = 0;
+    state->cntpq = 0;
+    for(i=0; i<=n-1; i++)
+    {
+        if( state->hasgz.ptr.p_bool[i] )
+        {
+            state->cntgz = state->cntgz+1;
+        }
+        if( state->hasts.ptr.p_bool[i] )
+        {
+            state->cntts = state->cntts+1;
+        }
+    }
+    for(i=0; i<=m-1; i++)
+    {
+        if( state->haswv.ptr.p_bool[i] )
+        {
+            state->cntwv = state->cntwv+1;
+        }
+        if( state->haspq.ptr.p_bool[i] )
+        {
+            state->cntpq = state->cntpq+1;
+        }
+    }
     
     /*
-     * Only sparse factorization needs special powering up
+     * Special initialization for sparse version
      */
     if( state->factorizationtype==1 )
     {
-        ae_assert(state->hkind==1, "VIPMPowerUp: unexpected HKind", _state);
-        nnzmax = state->sparseh.ridx.ptr.p_int[n];
-        if( state->msparse>0 )
-        {
-            nnzmax = nnzmax+state->sparseafull.ridx.ptr.p_int[state->msparse];
-        }
-        if( state->mdense>0 )
-        {
-            nnzmax = nnzmax+n*state->mdense;
-        }
-        nnzmax = nnzmax+(n+m);
-        
-        /*
-         * Prepare strictly lower triangle of template KKT matrix (KKT system without D and E
-         * terms being added to diagonals)
-         */
-        state->factsparsekkttmpl.m = n+m;
-        state->factsparsekkttmpl.n = n+m;
-        ivectorsetlengthatleast(&state->factsparsekkttmpl.idx, nnzmax, _state);
-        rvectorsetlengthatleast(&state->factsparsekkttmpl.vals, nnzmax, _state);
-        ivectorsetlengthatleast(&state->factsparsekkttmpl.ridx, n+m+1, _state);
-        state->factsparsekkttmpl.ridx.ptr.p_int[0] = 0;
-        offs = 0;
-        rowoffs = 0;
-        for(i=0; i<=n-1; i++)
-        {
-            ae_assert(state->sparseh.didx.ptr.p_int[i]+1==state->sparseh.uidx.ptr.p_int[i], "VIPMPowerUp: critical integrity check failed for diagonal of H", _state);
-            if( !state->isfrozen.ptr.p_bool[i] )
-            {
-                
-                /*
-                 * Entire row is not frozen, but some of its entries can be.
-                 * Output non-frozen offdiagonal entries.
-                 */
-                k0 = state->sparseh.ridx.ptr.p_int[i];
-                k1 = state->sparseh.didx.ptr.p_int[i]-1;
-                for(k=k0; k<=k1; k++)
-                {
-                    j = state->sparseh.idx.ptr.p_int[k];
-                    if( !state->isfrozen.ptr.p_bool[j] )
-                    {
-                        state->factsparsekkttmpl.idx.ptr.p_int[offs] = j;
-                        state->factsparsekkttmpl.vals.ptr.p_double[offs] = -state->sparseh.vals.ptr.p_double[k];
-                        offs = offs+1;
-                    }
-                }
-                
-                /*
-                 * Output diagonal entry (it is always not frozen)
-                 */
-                state->factsparsekkttmpl.idx.ptr.p_int[offs] = i;
-                state->factsparsekkttmpl.vals.ptr.p_double[offs] = -state->sparseh.vals.ptr.p_double[state->sparseh.didx.ptr.p_int[i]];
-                offs = offs+1;
-            }
-            else
-            {
-                
-                /*
-                 * Entire row is frozen, output just -1
-                 */
-                state->factsparsekkttmpl.idx.ptr.p_int[offs] = i;
-                state->factsparsekkttmpl.vals.ptr.p_double[offs] = -1.0;
-                offs = offs+1;
-            }
-            rowoffs = rowoffs+1;
-            state->factsparsekkttmpl.ridx.ptr.p_int[rowoffs] = offs;
-        }
-        for(i=0; i<=state->msparse-1; i++)
-        {
-            k0 = state->sparseafull.ridx.ptr.p_int[i];
-            k1 = state->sparseafull.ridx.ptr.p_int[i+1]-1;
-            for(k=k0; k<=k1; k++)
-            {
-                j = state->sparseafull.idx.ptr.p_int[k];
-                if( !state->isfrozen.ptr.p_bool[j] )
-                {
-                    state->factsparsekkttmpl.idx.ptr.p_int[offs] = j;
-                    state->factsparsekkttmpl.vals.ptr.p_double[offs] = state->sparseafull.vals.ptr.p_double[k];
-                    offs = offs+1;
-                }
-            }
-            state->factsparsekkttmpl.idx.ptr.p_int[offs] = rowoffs;
-            state->factsparsekkttmpl.vals.ptr.p_double[offs] = 0.0;
-            offs = offs+1;
-            rowoffs = rowoffs+1;
-            state->factsparsekkttmpl.ridx.ptr.p_int[rowoffs] = offs;
-        }
-        for(i=0; i<=state->mdense-1; i++)
-        {
-            for(k=0; k<=n-1; k++)
-            {
-                if( state->denseafull.ptr.pp_double[i][k]!=0.0&&!state->isfrozen.ptr.p_bool[k] )
-                {
-                    state->factsparsekkttmpl.idx.ptr.p_int[offs] = k;
-                    state->factsparsekkttmpl.vals.ptr.p_double[offs] = state->denseafull.ptr.pp_double[i][k];
-                    offs = offs+1;
-                }
-            }
-            state->factsparsekkttmpl.idx.ptr.p_int[offs] = rowoffs;
-            state->factsparsekkttmpl.vals.ptr.p_double[offs] = 0.0;
-            offs = offs+1;
-            rowoffs = rowoffs+1;
-            state->factsparsekkttmpl.ridx.ptr.p_int[rowoffs] = offs;
-        }
-        ae_assert(rowoffs==m+n, "VIPMPowerUp: critical integrity check failed", _state);
-        ae_assert(offs<=nnzmax, "VIPMPowerUp: critical integrity check failed", _state);
-        sparsecreatecrsinplace(&state->factsparsekkttmpl, _state);
-        factldlt = 1;
-        permauto = 0;
-        if( !spsymmanalyze(&state->factsparsekkttmpl, factldlt, permauto, &state->ldltanalysis, _state) )
-        {
-            ae_assert(ae_false, "VIPMPowerUp: critical integrity check failed, symbolically degenerate KKT system encountered", _state);
-        }
+        vipmsolver_reducedsysteminit(&state->reducedsparsesystem, state, _state);
     }
     state->factorizationpoweredup = ae_true;
     
@@ -43243,17 +43539,17 @@ static ae_bool vipmsolver_vipmfactorize(vipmstate* state,
         for(i=0; i<=n-1; i++)
         {
             v = (double)(0);
-            if( ae_fp_greater(alpha0,(double)(0)) )
+            if( alpha0>0 )
             {
                 v = v+alpha0*d->ptr.p_double[i];
             }
-            if( ae_fp_greater(alpha11,(double)(0)) )
+            if( alpha11>0 )
             {
                 v = v+alpha11;
             }
             v = v+state->diagr.ptr.p_double[i];
             v = v+dampeps;
-            ae_assert(ae_fp_greater(v,(double)(0)), "VIPMFactorize: integrity check failed, degenerate diagonal matrix", _state);
+            ae_assert(v>0, "VIPMFactorize: integrity check failed, degenerate diagonal matrix", _state);
             if( i>=nmain )
             {
                 if( !state->isfrozen.ptr.p_bool[i] )
@@ -43282,16 +43578,16 @@ static ae_bool vipmsolver_vipmfactorize(vipmstate* state,
              * Compute diagonal element of E
              */
             v = (double)(0);
-            if( ae_fp_greater(beta0,(double)(0)) )
+            if( beta0>0 )
             {
                 v = v+beta0*e->ptr.p_double[i];
             }
-            if( ae_fp_greater(beta11,(double)(0)) )
+            if( beta11>0 )
             {
                 v = v+beta11;
             }
             v = v+dampeps;
-            ae_assert(ae_fp_greater(v,(double)(0)), "VIPMFactorize: integrity check failed, degenerate diagonal matrix", _state);
+            ae_assert(v>0, "VIPMFactorize: integrity check failed, degenerate diagonal matrix", _state);
             
             /*
              * Compute diagonal modification Az*inv(Dz)*Az'
@@ -43431,54 +43727,45 @@ static ae_bool vipmsolver_vipmfactorize(vipmstate* state,
         rallocv(n+m, &state->facttmpdiag, _state);
         for(i=0; i<=n-1; i++)
         {
-            ae_assert(state->factsparsekkttmpl.didx.ptr.p_int[i]+1==state->factsparsekkttmpl.uidx.ptr.p_int[i], "VIPMFactorize: integrity check failed, no diagonal element", _state);
-            v = state->factsparsekkttmpl.vals.ptr.p_double[state->factsparsekkttmpl.didx.ptr.p_int[i]];
             vv = (double)(0);
-            if( ae_fp_greater(alpha0,(double)(0)) )
+            if( alpha0>0 )
             {
                 vv = vv+alpha0*d->ptr.p_double[i];
             }
-            if( ae_fp_greater(alpha11,(double)(0)) )
+            if( alpha11>0 )
             {
                 vv = vv+alpha11;
             }
             vv = vv+state->diagr.ptr.p_double[i];
             vv = vv+dampeps;
-            v = v-vv;
-            state->facttmpdiag.ptr.p_double[i] = v;
-            ae_assert(ae_fp_less(v,(double)(0)), "VIPMFactorize: integrity check failed, degenerate diagonal matrix", _state);
+            state->facttmpdiag.ptr.p_double[i] = -vv;
+            ae_assert(vv>0, "VIPMFactorize: integrity check failed, degenerate diagonal matrix", _state);
         }
         for(i=0; i<=msparse+mdense-1; i++)
         {
-            ae_assert(state->factsparsekkttmpl.didx.ptr.p_int[n+i]+1==state->factsparsekkttmpl.uidx.ptr.p_int[n+i], "VIPMFactorize: integrity check failed, no diagonal element", _state);
-            v = state->factsparsekkttmpl.vals.ptr.p_double[state->factsparsekkttmpl.didx.ptr.p_int[n+i]];
             vv = (double)(0);
-            if( ae_fp_greater(beta0,(double)(0)) )
+            if( beta0>0 )
             {
                 vv = vv+beta0*e->ptr.p_double[i];
             }
-            if( ae_fp_greater(beta11,(double)(0)) )
+            if( beta11>0 )
             {
                 vv = vv+beta11;
             }
             vv = vv+dampeps;
-            v = v+vv;
-            state->facttmpdiag.ptr.p_double[n+i] = v;
-            ae_assert(ae_fp_greater(v,(double)(0)), "VIPMFactorize: integrity check failed, degenerate diagonal matrix", _state);
+            state->facttmpdiag.ptr.p_double[n+i] = vv;
+            ae_assert(vv>0, "VIPMFactorize: integrity check failed, degenerate diagonal matrix", _state);
         }
         
         /*
          * Perform factorization
          * Perform additional integrity check: LDLT should reproduce diagonal of initial KKT system with good precision
          */
-        spsymmreloaddiagonal(&state->ldltanalysis, &state->facttmpdiag, _state);
-        spsymmsetmodificationstrategy(&state->ldltanalysis, 1, modeps, badchol, 0.0, 0.0, _state);
-        if( !spsymmfactorize(&state->ldltanalysis, _state) )
+        if( !vipmsolver_reducedsystemfactorizewithaddend(&state->reducedsparsesystem, &state->facttmpdiag, modeps, badchol, &sumsq, &errsq, _state) )
         {
             result = ae_false;
             return result;
         }
-        spsymmdiagerr(&state->ldltanalysis, &sumsq, &errsq, _state);
         if( ae_fp_greater(ae_sqrt(errsq/(1+sumsq), _state),ae_sqrt(ae_machineepsilon, _state)) )
         {
             if( state->dotrace )
@@ -43496,7 +43783,7 @@ static ae_bool vipmsolver_vipmfactorize(vipmstate* state,
          */
         if( state->dotrace )
         {
-            spsymmextract(&state->ldltanalysis, &state->factsparsekkt, &state->factsparsediagd, &state->factsparsekktpivp, _state);
+            spsymmextract(&state->reducedsparsesystem.analysis, &state->tmpsparse0, &state->tmp0, &state->tmpi, _state);
             ae_trace("--- sparse KKT factorization report ----------------------------------------------------------------\n");
             ae_trace("> diagonal terms D and E\n");
             if( ae_fp_neq(alpha0,(double)(0)) )
@@ -43526,24 +43813,24 @@ static ae_bool vipmsolver_vipmfactorize(vipmstate* state,
                     (double)(vv));
             }
             ae_trace("> LDLT factorization of entire KKT matrix\n");
-            v = ae_fabs(state->factsparsediagd.ptr.p_double[0], _state);
-            vv = ae_fabs(state->factsparsediagd.ptr.p_double[0], _state);
-            for(i=0; i<=n+m-1; i++)
+            v = ae_fabs(state->tmp0.ptr.p_double[0], _state);
+            vv = ae_fabs(state->tmp0.ptr.p_double[0], _state);
+            for(i=0; i<=state->tmpsparse0.n-1; i++)
             {
-                v = ae_maxreal(v, ae_fabs(state->factsparsediagd.ptr.p_double[i], _state), _state);
-                vv = ae_minreal(vv, ae_fabs(state->factsparsediagd.ptr.p_double[i], _state), _state);
+                v = ae_maxreal(v, ae_fabs(state->tmp0.ptr.p_double[i], _state), _state);
+                vv = ae_minreal(vv, ae_fabs(state->tmp0.ptr.p_double[i], _state), _state);
             }
             ae_trace("|D|          = %0.3e (min) ... %0.3e (max)\n",
                 (double)(vv),
                 (double)(v));
             v = 0.0;
-            for(i=0; i<=n+m-1; i++)
+            for(i=0; i<=state->tmpsparse0.n-1; i++)
             {
-                k0 = state->factsparsekkt.ridx.ptr.p_int[i];
-                k1 = state->factsparsekkt.didx.ptr.p_int[i];
+                k0 = state->tmpsparse0.ridx.ptr.p_int[i];
+                k1 = state->tmpsparse0.didx.ptr.p_int[i];
                 for(k=k0; k<=k1; k++)
                 {
-                    v = ae_maxreal(v, ae_fabs(state->factsparsekkt.vals.ptr.p_double[k], _state), _state);
+                    v = ae_maxreal(v, ae_fabs(state->tmpsparse0.vals.ptr.p_double[k], _state), _state);
                 }
             }
             ae_trace("max(|L|)     = %0.3e\n",
@@ -43674,7 +43961,7 @@ static void vipmsolver_solvereducedkktsystem(vipmstate* state,
      */
     if( state->factorizationtype==1 )
     {
-        spsymmsolve(&state->ldltanalysis, deltaxy, _state);
+        vipmsolver_reducedsystemsolve(&state->reducedsparsesystem, deltaxy, _state);
         for(i=0; i<=n-1; i++)
         {
             if( state->isfrozen.ptr.p_bool[i] )
@@ -43927,8 +44214,8 @@ static ae_bool vipmsolver_vipmprecomputenewtonfactorization(vipmstate* state,
 
 
 /*************************************************************************
-Solves KKT system stored in VIPMState with user-passed RHS.  The  solution
-X is either copied to Sol (AlphaSol=0) or added Sol:=AlphaSol*Sol+X.
+Solves KKT system stored in VIPMState with user-passed RHS.
+Sol must be preallocated VIPMVars object whose initial values are ignored.
 
   -- ALGLIB --
      Copyright 01.11.2019 by Bochkanov Sergey
@@ -43958,22 +44245,10 @@ static void vipmsolver_solvekktsystem(vipmstate* state,
     rallocv(n, &state->rhstaucap, _state);
     rallocv(m, &state->rhsbetacap, _state);
     rallocv(m, &state->rhsalphacap, _state);
-    for(i=0; i<=m-1; i++)
-    {
-        state->rhsalphacap.ptr.p_double[i] = rhs->alpha.ptr.p_double[i]-state->diagdqi.ptr.p_double[i]*rhs->gammaq.ptr.p_double[i];
-    }
-    for(i=0; i<=n-1; i++)
-    {
-        state->rhsnucap.ptr.p_double[i] = rhs->nu.ptr.p_double[i]+state->diagdzi.ptr.p_double[i]*rhs->gammaz.ptr.p_double[i];
-    }
-    for(i=0; i<=n-1; i++)
-    {
-        state->rhstaucap.ptr.p_double[i] = rhs->tau.ptr.p_double[i]-state->diagdsi.ptr.p_double[i]*rhs->gammas.ptr.p_double[i];
-    }
-    for(i=0; i<=m-1; i++)
-    {
-        state->rhsbetacap.ptr.p_double[i] = rhs->beta.ptr.p_double[i]-state->diagdwi.ptr.p_double[i]*rhs->gammaw.ptr.p_double[i];
-    }
+    rcopynegmuladdv(m, &state->diagdqi, &rhs->gammaq, &rhs->alpha, &state->rhsalphacap, _state);
+    rcopymuladdv(n, &state->diagdzi, &rhs->gammaz, &rhs->nu, &state->rhsnucap, _state);
+    rcopynegmuladdv(n, &state->diagdsi, &rhs->gammas, &rhs->tau, &state->rhstaucap, _state);
+    rcopynegmuladdv(m, &state->diagdwi, &rhs->gammaw, &rhs->beta, &state->rhsbetacap, _state);
     
     /*
      * Solve reduced KKT system
@@ -44013,6 +44288,9 @@ static void vipmsolver_solvekktsystem(vipmstate* state,
 
 /*************************************************************************
 Compute VIPM step by solving KKT system.
+
+VDResult must be preallocated VIPMVars object  whose  initial  values  are
+ignored.
 
 Returns False on failure to compute step direction with reasonable accuracy
 (it is advised to terminate iterations immediately).
@@ -44068,7 +44346,6 @@ static ae_bool vipmsolver_vipmcomputestepdirection(vipmstate* state,
      * and complementary slackness conditions. Analyze solution,
      * terminate immediately if primal/dual residuals are way too high.
      */
-    vipmsolver_varsinitbyzero(vdresult, n, m, _state);
     vipmsolver_rhscompute(state, v0, muestimate, vdestimate, &state->rhs, reg, _state);
     vrhsprim2 = vipmsolver_rhsprimal2(&state->rhs, n, m, _state);
     vrhsdual2 = vipmsolver_rhsdual2(&state->rhs, n, m, _state);
@@ -44508,7 +44785,7 @@ static void vipmsolver_traceprogress(vipmstate* state,
     ae_trace("alphaD  = %0.3e    (dual   step)\n",
         (double)(alphad));
     ae_trace("mu_cur  = %0.3e    (after the step)\n",
-        (double)(vipmsolver_varscomputemu(&state->current, _state)));
+        (double)(vipmsolver_varscomputemu(state, &state->current, _state)));
     ae_trace("> errors\n");
     ae_trace("errP    = %0.3e    (primal infeasibility, inf-norm)\n",
         (double)(errpinf));
@@ -45346,6 +45623,63 @@ void _vipmvars_destroy(void* _p)
 }
 
 
+void _vipmreducedsparsesystem_init(void* _p, ae_state *_state, ae_bool make_automatic)
+{
+    vipmreducedsparsesystem *p = (vipmreducedsparsesystem*)_p;
+    ae_touch_ptr((void*)p);
+    _sparsematrix_init(&p->rawsystem, _state, make_automatic);
+    ae_vector_init(&p->effectivediag, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->isdiagonal, 0, DT_BOOL, _state, make_automatic);
+    ae_vector_init(&p->rowdegrees, 0, DT_INT, _state, make_automatic);
+    ae_vector_init(&p->coldegrees, 0, DT_INT, _state, make_automatic);
+    _spcholanalysis_init(&p->analysis, _state, make_automatic);
+    ae_vector_init(&p->priorities, 0, DT_INT, _state, make_automatic);
+}
+
+
+void _vipmreducedsparsesystem_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_automatic)
+{
+    vipmreducedsparsesystem *dst = (vipmreducedsparsesystem*)_dst;
+    vipmreducedsparsesystem *src = (vipmreducedsparsesystem*)_src;
+    _sparsematrix_init_copy(&dst->rawsystem, &src->rawsystem, _state, make_automatic);
+    ae_vector_init_copy(&dst->effectivediag, &src->effectivediag, _state, make_automatic);
+    ae_vector_init_copy(&dst->isdiagonal, &src->isdiagonal, _state, make_automatic);
+    ae_vector_init_copy(&dst->rowdegrees, &src->rowdegrees, _state, make_automatic);
+    ae_vector_init_copy(&dst->coldegrees, &src->coldegrees, _state, make_automatic);
+    dst->ntotal = src->ntotal;
+    _spcholanalysis_init_copy(&dst->analysis, &src->analysis, _state, make_automatic);
+    ae_vector_init_copy(&dst->priorities, &src->priorities, _state, make_automatic);
+}
+
+
+void _vipmreducedsparsesystem_clear(void* _p)
+{
+    vipmreducedsparsesystem *p = (vipmreducedsparsesystem*)_p;
+    ae_touch_ptr((void*)p);
+    _sparsematrix_clear(&p->rawsystem);
+    ae_vector_clear(&p->effectivediag);
+    ae_vector_clear(&p->isdiagonal);
+    ae_vector_clear(&p->rowdegrees);
+    ae_vector_clear(&p->coldegrees);
+    _spcholanalysis_clear(&p->analysis);
+    ae_vector_clear(&p->priorities);
+}
+
+
+void _vipmreducedsparsesystem_destroy(void* _p)
+{
+    vipmreducedsparsesystem *p = (vipmreducedsparsesystem*)_p;
+    ae_touch_ptr((void*)p);
+    _sparsematrix_destroy(&p->rawsystem);
+    ae_vector_destroy(&p->effectivediag);
+    ae_vector_destroy(&p->isdiagonal);
+    ae_vector_destroy(&p->rowdegrees);
+    ae_vector_destroy(&p->coldegrees);
+    _spcholanalysis_destroy(&p->analysis);
+    ae_vector_destroy(&p->priorities);
+}
+
+
 void _vipmrighthandside_init(void* _p, ae_state *_state, ae_bool make_automatic)
 {
     vipmrighthandside *p = (vipmrighthandside*)_p;
@@ -45441,7 +45775,6 @@ void _vipmstate_init(void* _p, ae_state *_state, ae_bool make_automatic)
     ae_vector_init(&p->b, 0, DT_REAL, _state, make_automatic);
     ae_vector_init(&p->r, 0, DT_REAL, _state, make_automatic);
     ae_vector_init(&p->hasr, 0, DT_BOOL, _state, make_automatic);
-    _vipmvars_init(&p->x0, _state, make_automatic);
     _vipmvars_init(&p->current, _state, make_automatic);
     _vipmvars_init(&p->best, _state, make_automatic);
     _vipmvars_init(&p->trial, _state, make_automatic);
@@ -45471,12 +45804,8 @@ void _vipmstate_init(void* _p, ae_state *_state, ae_bool make_automatic)
     ae_vector_init(&p->factregdhrh, 0, DT_REAL, _state, make_automatic);
     ae_vector_init(&p->factinvregdzrz, 0, DT_REAL, _state, make_automatic);
     ae_vector_init(&p->factregewave, 0, DT_REAL, _state, make_automatic);
-    _sparsematrix_init(&p->factsparsekkttmpl, _state, make_automatic);
-    _sparsematrix_init(&p->factsparsekkt, _state, make_automatic);
-    ae_vector_init(&p->factsparsekktpivp, 0, DT_INT, _state, make_automatic);
     ae_vector_init(&p->facttmpdiag, 0, DT_REAL, _state, make_automatic);
-    _spcholanalysis_init(&p->ldltanalysis, _state, make_automatic);
-    ae_vector_init(&p->factsparsediagd, 0, DT_REAL, _state, make_automatic);
+    _vipmreducedsparsesystem_init(&p->reducedsparsesystem, _state, make_automatic);
     _vipmrighthandside_init(&p->rhs, _state, make_automatic);
     ae_vector_init(&p->rhsalphacap, 0, DT_REAL, _state, make_automatic);
     ae_vector_init(&p->rhsbetacap, 0, DT_REAL, _state, make_automatic);
@@ -45519,6 +45848,7 @@ void _vipmstate_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make
     _sparsematrix_init_copy(&dst->sparseh, &src->sparseh, _state, make_automatic);
     ae_vector_init_copy(&dst->diagr, &src->diagr, _state, make_automatic);
     dst->hkind = src->hkind;
+    dst->isdiagonalh = src->isdiagonalh;
     ae_vector_init_copy(&dst->bndl, &src->bndl, _state, make_automatic);
     ae_vector_init_copy(&dst->bndu, &src->bndu, _state, make_automatic);
     ae_vector_init_copy(&dst->rawbndl, &src->rawbndl, _state, make_automatic);
@@ -45537,7 +45867,6 @@ void _vipmstate_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make
     ae_vector_init_copy(&dst->hasr, &src->hasr, _state, make_automatic);
     dst->mdense = src->mdense;
     dst->msparse = src->msparse;
-    _vipmvars_init_copy(&dst->x0, &src->x0, _state, make_automatic);
     _vipmvars_init_copy(&dst->current, &src->current, _state, make_automatic);
     _vipmvars_init_copy(&dst->best, &src->best, _state, make_automatic);
     _vipmvars_init_copy(&dst->trial, &src->trial, _state, make_automatic);
@@ -45548,6 +45877,10 @@ void _vipmstate_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make
     ae_vector_init_copy(&dst->hasts, &src->hasts, _state, make_automatic);
     ae_vector_init_copy(&dst->haswv, &src->haswv, _state, make_automatic);
     ae_vector_init_copy(&dst->haspq, &src->haspq, _state, make_automatic);
+    dst->cntgz = src->cntgz;
+    dst->cntts = src->cntts;
+    dst->cntwv = src->cntwv;
+    dst->cntpq = src->cntpq;
     dst->repiterationscount = src->repiterationscount;
     dst->repncholesky = src->repncholesky;
     dst->dotrace = src->dotrace;
@@ -45574,12 +45907,8 @@ void _vipmstate_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make
     ae_vector_init_copy(&dst->factregdhrh, &src->factregdhrh, _state, make_automatic);
     ae_vector_init_copy(&dst->factinvregdzrz, &src->factinvregdzrz, _state, make_automatic);
     ae_vector_init_copy(&dst->factregewave, &src->factregewave, _state, make_automatic);
-    _sparsematrix_init_copy(&dst->factsparsekkttmpl, &src->factsparsekkttmpl, _state, make_automatic);
-    _sparsematrix_init_copy(&dst->factsparsekkt, &src->factsparsekkt, _state, make_automatic);
-    ae_vector_init_copy(&dst->factsparsekktpivp, &src->factsparsekktpivp, _state, make_automatic);
     ae_vector_init_copy(&dst->facttmpdiag, &src->facttmpdiag, _state, make_automatic);
-    _spcholanalysis_init_copy(&dst->ldltanalysis, &src->ldltanalysis, _state, make_automatic);
-    ae_vector_init_copy(&dst->factsparsediagd, &src->factsparsediagd, _state, make_automatic);
+    _vipmreducedsparsesystem_init_copy(&dst->reducedsparsesystem, &src->reducedsparsesystem, _state, make_automatic);
     _vipmrighthandside_init_copy(&dst->rhs, &src->rhs, _state, make_automatic);
     ae_vector_init_copy(&dst->rhsalphacap, &src->rhsalphacap, _state, make_automatic);
     ae_vector_init_copy(&dst->rhsbetacap, &src->rhsbetacap, _state, make_automatic);
@@ -45629,7 +45958,6 @@ void _vipmstate_clear(void* _p)
     ae_vector_clear(&p->b);
     ae_vector_clear(&p->r);
     ae_vector_clear(&p->hasr);
-    _vipmvars_clear(&p->x0);
     _vipmvars_clear(&p->current);
     _vipmvars_clear(&p->best);
     _vipmvars_clear(&p->trial);
@@ -45659,12 +45987,8 @@ void _vipmstate_clear(void* _p)
     ae_vector_clear(&p->factregdhrh);
     ae_vector_clear(&p->factinvregdzrz);
     ae_vector_clear(&p->factregewave);
-    _sparsematrix_clear(&p->factsparsekkttmpl);
-    _sparsematrix_clear(&p->factsparsekkt);
-    ae_vector_clear(&p->factsparsekktpivp);
     ae_vector_clear(&p->facttmpdiag);
-    _spcholanalysis_clear(&p->ldltanalysis);
-    ae_vector_clear(&p->factsparsediagd);
+    _vipmreducedsparsesystem_clear(&p->reducedsparsesystem);
     _vipmrighthandside_clear(&p->rhs);
     ae_vector_clear(&p->rhsalphacap);
     ae_vector_clear(&p->rhsbetacap);
@@ -45714,7 +46038,6 @@ void _vipmstate_destroy(void* _p)
     ae_vector_destroy(&p->b);
     ae_vector_destroy(&p->r);
     ae_vector_destroy(&p->hasr);
-    _vipmvars_destroy(&p->x0);
     _vipmvars_destroy(&p->current);
     _vipmvars_destroy(&p->best);
     _vipmvars_destroy(&p->trial);
@@ -45744,12 +46067,8 @@ void _vipmstate_destroy(void* _p)
     ae_vector_destroy(&p->factregdhrh);
     ae_vector_destroy(&p->factinvregdzrz);
     ae_vector_destroy(&p->factregewave);
-    _sparsematrix_destroy(&p->factsparsekkttmpl);
-    _sparsematrix_destroy(&p->factsparsekkt);
-    ae_vector_destroy(&p->factsparsekktpivp);
     ae_vector_destroy(&p->facttmpdiag);
-    _spcholanalysis_destroy(&p->ldltanalysis);
-    ae_vector_destroy(&p->factsparsediagd);
+    _vipmreducedsparsesystem_destroy(&p->reducedsparsesystem);
     _vipmrighthandside_destroy(&p->rhs);
     ae_vector_destroy(&p->rhsalphacap);
     ae_vector_destroy(&p->rhsbetacap);
@@ -56410,7 +56729,7 @@ static void nlcsqp_meritphaseinit(minsqpmeritphasestate* meritstate,
     }
     ae_vector_set_length(&meritstate->rmeritphasestate.ia, 7+1, _state);
     ae_vector_set_length(&meritstate->rmeritphasestate.ba, 3+1, _state);
-    ae_vector_set_length(&meritstate->rmeritphasestate.ra, 9+1, _state);
+    ae_vector_set_length(&meritstate->rmeritphasestate.ra, 11+1, _state);
     meritstate->rmeritphasestate.stage = -1;
 }
 
@@ -56462,6 +56781,7 @@ static ae_bool nlcsqp_meritphaseiteration(minsqpstate* state,
     double f1;
     double nu;
     double localstp;
+    double tol;
     double stepklagval;
     double stepknlagval;
     ae_bool hessianupdateperformed;
@@ -56469,6 +56789,7 @@ static ae_bool nlcsqp_meritphaseiteration(minsqpstate* state,
     ae_bool doprobing;
     ae_bool dotracexd;
     double stp;
+    double expandedrad;
     ae_bool result;
 
 
@@ -56504,9 +56825,11 @@ static ae_bool nlcsqp_meritphaseiteration(minsqpstate* state,
         f1 = meritstate->rmeritphasestate.ra.ptr.p_double[4];
         nu = meritstate->rmeritphasestate.ra.ptr.p_double[5];
         localstp = meritstate->rmeritphasestate.ra.ptr.p_double[6];
-        stepklagval = meritstate->rmeritphasestate.ra.ptr.p_double[7];
-        stepknlagval = meritstate->rmeritphasestate.ra.ptr.p_double[8];
-        stp = meritstate->rmeritphasestate.ra.ptr.p_double[9];
+        tol = meritstate->rmeritphasestate.ra.ptr.p_double[7];
+        stepklagval = meritstate->rmeritphasestate.ra.ptr.p_double[8];
+        stepknlagval = meritstate->rmeritphasestate.ra.ptr.p_double[9];
+        stp = meritstate->rmeritphasestate.ra.ptr.p_double[10];
+        expandedrad = meritstate->rmeritphasestate.ra.ptr.p_double[11];
     }
     else
     {
@@ -56529,9 +56852,11 @@ static ae_bool nlcsqp_meritphaseiteration(minsqpstate* state,
         f1 = 88;
         nu = -861;
         localstp = -678;
-        stepklagval = -731;
-        stepknlagval = -675;
-        stp = -763;
+        tol = -731;
+        stepklagval = -675;
+        stepknlagval = -763;
+        stp = -233;
+        expandedrad = -936;
     }
     if( meritstate->rmeritphasestate.stage==0 )
     {
@@ -56785,14 +57110,17 @@ lbl_4:
      * QP subproblem) or not.
      *
      * An increase is NOT needed if at least one of the following holds:
+     * * present value of BigC is already nearly maximum
      * * a long step was performed
-     * * any single constraint can be made feasible within trust region
+     * * any single constraint can be made feasible within box with radius slightly larger max|D|
      *
      * Thus, BigC is requested to be increased if a short step was made, but there are some
-     * constraints that are infeasible within trust region.
+     * constraints that are infeasible within max|D|-sized box
      */
-    if( ae_fp_less(rmaxabsv(n, &meritstate->d, _state),0.9*state->trustrad) )
+    if( ae_fp_less(rmaxabsv(n, &meritstate->d, _state),0.9*state->trustrad)&&ae_fp_less(state->bigc,0.9*nlcsqp_maxbigc) )
     {
+        expandedrad = 1.1*rmaxabsv(n, &meritstate->d, _state);
+        tol = ae_maxreal(ae_sqrt(ae_machineepsilon, _state)*state->trustrad, 1000*ae_machineepsilon, _state);
         for(i=0; i<=nec+nic-1; i++)
         {
             v = (double)(0);
@@ -56800,28 +57128,28 @@ lbl_4:
             for(j=0; j<=n-1; j++)
             {
                 v = v+state->scaledcleic.ptr.pp_double[i][j]*state->stepkx.ptr.p_double[j];
-                vv = vv+ae_fabs(state->scaledcleic.ptr.pp_double[i][j]*state->trustrad, _state);
+                vv = vv+ae_fabs(state->scaledcleic.ptr.pp_double[i][j]*expandedrad, _state);
             }
             v = v-state->scaledcleic.ptr.pp_double[i][n];
             if( i>=nec )
             {
                 v = ae_maxreal(v, 0.0, _state);
             }
-            meritstate->increasebigc = meritstate->increasebigc||ae_fp_greater(ae_fabs(v, _state),vv);
+            meritstate->increasebigc = meritstate->increasebigc||ae_fp_greater(ae_fabs(v, _state),vv+tol);
         }
-        for(i=1; i<=nlec+nlic-1; i++)
+        for(i=1; i<=nlec+nlic; i++)
         {
             v = state->stepkfi.ptr.p_double[i];
             vv = (double)(0);
             for(j=0; j<=n-1; j++)
             {
-                vv = vv+ae_fabs(state->stepkj.ptr.pp_double[i][j]*state->trustrad, _state);
+                vv = vv+ae_fabs(state->stepkj.ptr.pp_double[i][j]*expandedrad, _state);
             }
             if( i>=nlec+1 )
             {
                 v = ae_maxreal(v, 0.0, _state);
             }
-            meritstate->increasebigc = meritstate->increasebigc||ae_fp_greater(ae_fabs(v, _state),vv);
+            meritstate->increasebigc = meritstate->increasebigc||ae_fp_greater(ae_fabs(v, _state),vv+tol);
         }
     }
     
@@ -57090,9 +57418,11 @@ lbl_rcomm:
     meritstate->rmeritphasestate.ra.ptr.p_double[4] = f1;
     meritstate->rmeritphasestate.ra.ptr.p_double[5] = nu;
     meritstate->rmeritphasestate.ra.ptr.p_double[6] = localstp;
-    meritstate->rmeritphasestate.ra.ptr.p_double[7] = stepklagval;
-    meritstate->rmeritphasestate.ra.ptr.p_double[8] = stepknlagval;
-    meritstate->rmeritphasestate.ra.ptr.p_double[9] = stp;
+    meritstate->rmeritphasestate.ra.ptr.p_double[7] = tol;
+    meritstate->rmeritphasestate.ra.ptr.p_double[8] = stepklagval;
+    meritstate->rmeritphasestate.ra.ptr.p_double[9] = stepknlagval;
+    meritstate->rmeritphasestate.ra.ptr.p_double[10] = stp;
+    meritstate->rmeritphasestate.ra.ptr.p_double[11] = expandedrad;
     return result;
 }
 
@@ -65770,6 +66100,7 @@ void minlpoptimize(minlpstate* state, ae_state *_state)
             presolvebwd(&state->presolver, &state->xs, &state->cs, &state->lagbc, &state->laglc, _state);
             state->repn = n;
             state->repm = m;
+            state->repiterationscount = state->ipm.repiterationscount;
         }
         
         /*
@@ -66154,8 +66485,8 @@ void minslpinitbuf(/* Real    */ ae_vector* bndl,
      * Prepare RCOMM state
      */
     ae_vector_set_length(&state->rstate.ia, 9+1, _state);
-    ae_vector_set_length(&state->rstate.ba, 2+1, _state);
-    ae_vector_set_length(&state->rstate.ra, 11+1, _state);
+    ae_vector_set_length(&state->rstate.ba, 3+1, _state);
+    ae_vector_set_length(&state->rstate.ra, 16+1, _state);
     state->rstate.stage = -1;
     state->needfij = ae_false;
     state->xupdated = ae_false;
@@ -66338,9 +66669,15 @@ ae_bool minslpiteration(minslpstate* state,
     double multiplyby;
     double setscaleto;
     double prevtrustrad;
+    ae_bool increasebigc;
+    double d1nrm;
     double mu;
+    double expandedrad;
+    double tol;
     ae_bool dotrace;
     ae_bool dodetailedtrace;
+    double maxlag;
+    double maxhist;
     ae_bool result;
 
 
@@ -66368,8 +66705,9 @@ ae_bool minslpiteration(minslpstate* state,
         innerk = state->rstate.ia.ptr.p_int[8];
         status = state->rstate.ia.ptr.p_int[9];
         lpstagesuccess = state->rstate.ba.ptr.p_bool[0];
-        dotrace = state->rstate.ba.ptr.p_bool[1];
-        dodetailedtrace = state->rstate.ba.ptr.p_bool[2];
+        increasebigc = state->rstate.ba.ptr.p_bool[1];
+        dotrace = state->rstate.ba.ptr.p_bool[2];
+        dodetailedtrace = state->rstate.ba.ptr.p_bool[3];
         v = state->rstate.ra.ptr.p_double[0];
         vv = state->rstate.ra.ptr.p_double[1];
         mx = state->rstate.ra.ptr.p_double[2];
@@ -66381,7 +66719,12 @@ ae_bool minslpiteration(minslpstate* state,
         multiplyby = state->rstate.ra.ptr.p_double[8];
         setscaleto = state->rstate.ra.ptr.p_double[9];
         prevtrustrad = state->rstate.ra.ptr.p_double[10];
-        mu = state->rstate.ra.ptr.p_double[11];
+        d1nrm = state->rstate.ra.ptr.p_double[11];
+        mu = state->rstate.ra.ptr.p_double[12];
+        expandedrad = state->rstate.ra.ptr.p_double[13];
+        tol = state->rstate.ra.ptr.p_double[14];
+        maxlag = state->rstate.ra.ptr.p_double[15];
+        maxhist = state->rstate.ra.ptr.p_double[16];
     }
     else
     {
@@ -66396,20 +66739,26 @@ ae_bool minslpiteration(minslpstate* state,
         innerk = 809;
         status = 205;
         lpstagesuccess = ae_false;
-        dotrace = ae_true;
-        dodetailedtrace = ae_false;
-        v = 763;
-        vv = -541;
-        mx = -698;
-        gammamax = -900;
-        f1 = -318;
-        f2 = -940;
-        stp = 1016;
-        deltamax = -229;
-        multiplyby = -536;
-        setscaleto = 487;
-        prevtrustrad = -115;
-        mu = 886;
+        increasebigc = ae_true;
+        dotrace = ae_false;
+        dodetailedtrace = ae_true;
+        v = -541;
+        vv = -698;
+        mx = -900;
+        gammamax = -318;
+        f1 = -940;
+        f2 = 1016;
+        stp = -229;
+        deltamax = -536;
+        multiplyby = 487;
+        setscaleto = -115;
+        prevtrustrad = 886;
+        d1nrm = 346;
+        mu = -722;
+        expandedrad = -413;
+        tol = -461;
+        maxlag = 927;
+        maxhist = 201;
     }
     if( state->rstate.stage==0 )
     {
@@ -66461,6 +66810,7 @@ ae_bool minslpiteration(minslpstate* state,
      */
     state->lpfailurecnt = 0;
     state->fstagnationcnt = 0;
+    state->bigc = nlcslp_initbigc;
     state->trustrad = nlcslp_inittrustrad;
     for(i=0; i<=nlec+nlic; i++)
     {
@@ -66638,6 +66988,9 @@ lbl_5:
             (double)(mx));
         ae_trace("gammaMax      = %0.3e\n",
             (double)(gammamax));
+        ae_trace("max|LagMult|  = %0.3e    (maximum over %0d last iterations)\n",
+            (double)(rmaxabsv(state->historylen, &state->maxlaghistory, _state)),
+            (int)(state->historylen));
     }
     
     /*
@@ -66655,9 +67008,9 @@ lbl_5:
      *       is to perform one look-ahead step and use updated constraint values
      *       back at the initial point.
      */
-    nlcslp_phase13init(&state->state13, n, nec, nic, nlec, nlic, ae_true, _state);
+    nlcslp_phase13init(&state->state13, n, nec, nic, nlec, nlic, ae_false, _state);
 lbl_7:
-    if( !nlcslp_phase13iteration(state, &state->state13, smonitor, userterminationneeded, &state->stepkx, &state->stepkfi, &state->stepkj, &state->meritlagmult, &status, &stp, _state) )
+    if( !nlcslp_phase13iteration(state, &state->state13, smonitor, userterminationneeded, &state->stepkx, &state->stepkfi, &state->stepkj, &state->meritlagmult, &status, &d1nrm, &stp, _state) )
     {
         goto lbl_8;
     }
@@ -66674,15 +67027,71 @@ lbl_8:
     {
         goto lbl_6;
     }
-    mu = ae_maxreal(rmaxabsv(state->historylen, &state->maxlaghistory, _state), rmaxabsv(nec+nic+nlec+nlic, &state->meritlagmult, _state), _state);
+    maxlag = rmaxabsv(nec+nic+nlec+nlic, &state->meritlagmult, _state);
+    maxhist = rmaxabsv(state->historylen, &state->maxlaghistory, _state);
+    mu = coalesce(ae_maxreal(maxhist, maxlag, _state), nlcslp_defaultl1penalty, _state);
     for(i=state->historylen; i>=1; i--)
     {
         state->meritfunctionhistory.ptr.p_double[i] = state->meritfunctionhistory.ptr.p_double[i-1];
         state->maxlaghistory.ptr.p_double[i] = state->maxlaghistory.ptr.p_double[i-1];
     }
     state->meritfunctionhistory.ptr.p_double[0] = nlcslp_meritfunction(state, &state->stepkx, &state->stepkfi, &state->meritlagmult, mu, &state->tmpmerit, _state);
-    state->maxlaghistory.ptr.p_double[0] = rmaxabsv(nec+nic+nlec+nlic, &state->meritlagmult, _state);
+    state->maxlaghistory.ptr.p_double[0] = coalesce(maxlag, nlcslp_defaultmaglagdecay*maxhist, _state);
     state->historylen = ae_minint(state->historylen+1, nlcslp_nonmonotonicphase2limit, _state);
+    
+    /*
+     * Decide whether we need to increase BigC (penalty for the constraint violation that
+     * is used by the linear subsolver) or not. BigC is increased if all of the following
+     * holds true:
+     * * BigC can be increased (it is below upper limit)
+     * * a short step was performed (shorter than the current trust region)
+     * * at least one of the constraints is infeasible within current trust region
+     */
+    if( ae_fp_less(d1nrm*stp,0.99*state->trustrad)&&ae_fp_less(state->bigc,0.9*nlcslp_maxbigc) )
+    {
+        increasebigc = ae_false;
+        expandedrad = 1.1*state->trustrad;
+        tol = ae_maxreal(ae_sqrt(ae_machineepsilon, _state)*state->trustrad, 1000*ae_machineepsilon, _state);
+        for(i=0; i<=nec+nic-1; i++)
+        {
+            v = (double)(0);
+            vv = (double)(0);
+            for(j=0; j<=n-1; j++)
+            {
+                v = v+state->scaledcleic.ptr.pp_double[i][j]*state->stepkx.ptr.p_double[j];
+                vv = vv+ae_fabs(state->scaledcleic.ptr.pp_double[i][j]*expandedrad, _state);
+            }
+            v = v-state->scaledcleic.ptr.pp_double[i][n];
+            if( i>=nec )
+            {
+                v = ae_maxreal(v, 0.0, _state);
+            }
+            increasebigc = increasebigc||ae_fp_greater(ae_fabs(v, _state),vv+tol);
+        }
+        for(i=1; i<=nlec+nlic; i++)
+        {
+            v = state->stepkfi.ptr.p_double[i];
+            vv = (double)(0);
+            for(j=0; j<=n-1; j++)
+            {
+                vv = vv+ae_fabs(state->stepkj.ptr.pp_double[i][j]*expandedrad, _state);
+            }
+            if( i>=nlec+1 )
+            {
+                v = ae_maxreal(v, 0.0, _state);
+            }
+            increasebigc = increasebigc||ae_fp_greater(ae_fabs(v, _state),vv+tol);
+        }
+        if( increasebigc )
+        {
+            state->bigc = ae_minreal(10*state->bigc, nlcslp_maxbigc, _state);
+            if( dotrace )
+            {
+                ae_trace("BigC        = %0.3e (trust radius is small, but some constraints are still infeasible - increasing constraint violation penalty)\n",
+                    (double)(state->bigc));
+            }
+        }
+    }
     
     /*
      * PHASE 2: conjugate subiterations
@@ -66739,6 +67148,7 @@ lbl_12:
      * Settings NonmonotonicPhase2Limit to 0 will result in strictly monotonic line search,
      * whilst having nonzero limits means that we perform more robust nonmonotonic search.
      */
+    ae_assert(state->historylen>=1, "SLP: integrity check 6559 failed", _state);
     f1 = state->meritfunctionhistory.ptr.p_double[0];
     for(i=1; i<=state->historylen; i++)
     {
@@ -66914,8 +67324,9 @@ lbl_rcomm:
     state->rstate.ia.ptr.p_int[8] = innerk;
     state->rstate.ia.ptr.p_int[9] = status;
     state->rstate.ba.ptr.p_bool[0] = lpstagesuccess;
-    state->rstate.ba.ptr.p_bool[1] = dotrace;
-    state->rstate.ba.ptr.p_bool[2] = dodetailedtrace;
+    state->rstate.ba.ptr.p_bool[1] = increasebigc;
+    state->rstate.ba.ptr.p_bool[2] = dotrace;
+    state->rstate.ba.ptr.p_bool[3] = dodetailedtrace;
     state->rstate.ra.ptr.p_double[0] = v;
     state->rstate.ra.ptr.p_double[1] = vv;
     state->rstate.ra.ptr.p_double[2] = mx;
@@ -66927,7 +67338,12 @@ lbl_rcomm:
     state->rstate.ra.ptr.p_double[8] = multiplyby;
     state->rstate.ra.ptr.p_double[9] = setscaleto;
     state->rstate.ra.ptr.p_double[10] = prevtrustrad;
-    state->rstate.ra.ptr.p_double[11] = mu;
+    state->rstate.ra.ptr.p_double[11] = d1nrm;
+    state->rstate.ra.ptr.p_double[12] = mu;
+    state->rstate.ra.ptr.p_double[13] = expandedrad;
+    state->rstate.ra.ptr.p_double[14] = tol;
+    state->rstate.ra.ptr.p_double[15] = maxlag;
+    state->rstate.ra.ptr.p_double[16] = maxhist;
     return result;
 }
 
@@ -67264,7 +67680,7 @@ static ae_bool nlcslp_lpsubproblemsolve(minslpstate* state,
     v = coalesce(ae_sqrt(v, _state), 1.0, _state);
     for(i=n; i<=nslack-1; i++)
     {
-        subsolver->curb.ptr.p_double[i] = (nlcslp_bigc+1.0/(1+i))*v;
+        subsolver->curb.ptr.p_double[i] = (state->bigc+1.0/(1+i))*v;
     }
     
     /*
@@ -67779,7 +68195,8 @@ OUTPUT PARAMETERS:
                       of the outer iteration
                     * zero, if algorithm is terminated (RepTerminationType
                       is set to appropriate value)
-    Stp         -   step length, in [0,1]
+    DNrm        -   inf-norm of the proposed step vector D
+    Stp         -   step length (multiplier for D), in [0,1]
 
   -- ALGLIB --
      Copyright 05.02.2019 by Bochkanov Sergey
@@ -67793,6 +68210,7 @@ static ae_bool nlcslp_phase13iteration(minslpstate* state,
      /* Real    */ ae_matrix* curj,
      /* Real    */ ae_vector* lagmult,
      ae_int_t* status,
+     double* dnrm,
      double* stp,
      ae_state *_state)
 {
@@ -67853,25 +68271,25 @@ static ae_bool nlcslp_phase13iteration(minslpstate* state,
     }
     else
     {
-        n = 346;
-        nslack = -722;
-        nec = -413;
-        nic = -461;
-        nlec = 927;
-        nlic = 201;
-        innerk = 922;
-        i = -154;
-        j = 306;
+        n = 922;
+        nslack = -154;
+        nec = 306;
+        nic = -1011;
+        nlec = 951;
+        nlic = -463;
+        innerk = 88;
+        i = -861;
+        j = -678;
         dotrace = ae_true;
         doprobing = ae_true;
         dotracexd = ae_true;
-        v = 88;
-        mx = -861;
-        f0 = -678;
-        f1 = -731;
-        nu = -675;
-        localstp = -763;
-        mu = -233;
+        v = -233;
+        mx = -936;
+        f0 = -279;
+        f1 = 94;
+        nu = -812;
+        localstp = 427;
+        mu = 178;
     }
     if( state13->rphase13state.stage==0 )
     {
@@ -67925,6 +68343,7 @@ static ae_bool nlcslp_phase13iteration(minslpstate* state,
      */
     *status = 1;
     *stp = (double)(0);
+    *dnrm = (double)(0);
     
     /*
      * Determine step direction using linearized model with no conjugacy terms
@@ -67980,8 +68399,8 @@ static ae_bool nlcslp_phase13iteration(minslpstate* state,
         result = ae_false;
         return result;
     }
-    nlcslp_lpsubproblemappendconjugacyconstraint(state, &state->subsolver, &state13->d, _state);
     mu = ae_maxreal(rmaxabsv(state->historylen, &state->maxlaghistory, _state), rmaxabsv(nec+nic+nlec+nlic, lagmult, _state), _state);
+    mu = coalesce(mu, nlcslp_defaultl1penalty, _state);
     
     /*
      * Compute second order correction if required. The issue we address here
@@ -68084,8 +68503,16 @@ lbl_0:
             state13->d.ptr.p_double[i] = state13->dx.ptr.p_double[i];
         }
     }
-    nlcslp_lpsubproblemappendconjugacyconstraint(state, &state->subsolver, &state13->d, _state);
 lbl_4:
+    
+    /*
+     * Now we have search direction in D:
+     * * compute DNrm
+     * * append D to the list of the conjugacy constraints, so next time when we use the solver we will
+     *   automatically produce conjugate direction
+     */
+    *dnrm = rmaxabsv(n, &state13->d, _state);
+    nlcslp_lpsubproblemappendconjugacyconstraint(state, &state->subsolver, &state13->d, _state);
     
     /*
      * Perform merit function backtracking line search, with trial point being
@@ -68509,32 +68936,32 @@ static ae_bool nlcslp_phase2iteration(minslpstate* state,
     }
     else
     {
-        n = -936;
-        nslack = -279;
-        nec = 94;
-        nic = -812;
-        nlec = 427;
-        nlic = 178;
-        mcinfo = -819;
-        mcnfev = -826;
-        mcstage = 667;
-        i = 692;
-        j = 84;
-        innerk = 529;
-        nondescentcnt = 14;
-        dotrace = ae_false;
+        n = -819;
+        nslack = -826;
+        nec = 667;
+        nic = 692;
+        nlec = 84;
+        nlic = 529;
+        mcinfo = 14;
+        mcnfev = 386;
+        mcstage = -908;
+        i = 577;
+        j = 289;
+        innerk = 317;
+        nondescentcnt = 476;
+        dotrace = ae_true;
         doprobing = ae_false;
         dotracexd = ae_true;
-        stp = 289;
-        v = 317;
-        vv = 476;
-        mx = -889;
-        stepklagval = -400;
-        stepknlagval = 489;
-        gammaprev = -962;
-        f0 = 161;
-        f1 = -447;
-        mu = -799;
+        stp = -962;
+        v = 161;
+        vv = -447;
+        mx = -799;
+        stepklagval = 508;
+        stepknlagval = -153;
+        gammaprev = -450;
+        f0 = 769;
+        f1 = 638;
+        mu = -361;
     }
     if( state2->rphase2state.stage==0 )
     {
@@ -68590,6 +69017,7 @@ static ae_bool nlcslp_phase2iteration(minslpstate* state,
      * * scaled Jacobian J
      */
     mu = ae_maxreal(rmaxabsv(state->historylen, &state->maxlaghistory, _state), rmaxabsv(nec+nic+nlec+nlic, &state->meritlagmult, _state), _state);
+    mu = coalesce(mu, nlcslp_defaultl1penalty, _state);
     nondescentcnt = 0;
     nlcslp_lpsubproblemrestart(state, &state->subsolver, _state);
     innerk = 1;
@@ -69961,6 +70389,7 @@ void _minslpstate_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool ma
     _minslpphase13state_init_copy(&dst->state13, &src->state13, _state, make_automatic);
     _minslpphase2state_init_copy(&dst->state2, &src->state2, _state, make_automatic);
     dst->trustrad = src->trustrad;
+    dst->bigc = src->bigc;
     dst->lpfailurecnt = src->lpfailurecnt;
     dst->fstagnationcnt = src->fstagnationcnt;
     ae_vector_init_copy(&dst->step0x, &src->step0x, _state, make_automatic);
@@ -71575,7 +72004,7 @@ lbl_4:
     ae_v_move(&state->fp2.ptr.p_double[0], 1, &state->fi.ptr.p_double[0], 1, ae_v_len(0,ng+nh));
     for(i=0; i<=ng+nh; i++)
     {
-        state->j.ptr.pp_double[i][k] = (8*(state->fp1.ptr.p_double[i]-state->fm1.ptr.p_double[i])-(state->fp2.ptr.p_double[i]-state->fm2.ptr.p_double[i]))/(6*state->diffstep*state->s.ptr.p_double[i]);
+        state->j.ptr.pp_double[i][k] = (8*(state->fp1.ptr.p_double[i]-state->fm1.ptr.p_double[i])-(state->fp2.ptr.p_double[i]-state->fm2.ptr.p_double[i]))/(6*state->diffstep*state->s.ptr.p_double[k]);
     }
     k = k+1;
     goto lbl_35;
@@ -81729,6 +82158,78 @@ void lptestproblemcreate(ae_int_t n,
     p->m = 0;
     ae_vector_set_length(&p->al, 0, _state);
     ae_vector_set_length(&p->au, 0, _state);
+}
+
+
+/*************************************************************************
+Query test problem info
+
+This function is intended for internal use by ALGLIB.
+
+  -- ALGLIB --
+     Copyright 20.07.2021 by Bochkanov Sergey
+*************************************************************************/
+ae_bool lptestproblemhasknowntarget(lptestproblem* p, ae_state *_state)
+{
+    ae_bool result;
+
+
+    result = p->hasknowntarget;
+    return result;
+}
+
+
+/*************************************************************************
+Query test problem info
+
+This function is intended for internal use by ALGLIB.
+
+  -- ALGLIB --
+     Copyright 20.07.2021 by Bochkanov Sergey
+*************************************************************************/
+double lptestproblemgettargetf(lptestproblem* p, ae_state *_state)
+{
+    double result;
+
+
+    result = p->targetf;
+    return result;
+}
+
+
+/*************************************************************************
+Query test problem info
+
+This function is intended for internal use by ALGLIB.
+
+  -- ALGLIB --
+     Copyright 20.07.2021 by Bochkanov Sergey
+*************************************************************************/
+ae_int_t lptestproblemgetn(lptestproblem* p, ae_state *_state)
+{
+    ae_int_t result;
+
+
+    result = p->n;
+    return result;
+}
+
+
+/*************************************************************************
+Query test problem info
+
+This function is intended for internal use by ALGLIB.
+
+  -- ALGLIB --
+     Copyright 20.07.2021 by Bochkanov Sergey
+*************************************************************************/
+ae_int_t lptestproblemgetm(lptestproblem* p, ae_state *_state)
+{
+    ae_int_t result;
+
+
+    result = p->m;
+    return result;
 }
 
 

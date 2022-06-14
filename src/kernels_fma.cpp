@@ -1,5 +1,5 @@
 /*************************************************************************
-ALGLIB 3.18.0 (source code generated 2021-10-25)
+ALGLIB 3.19.0 (source code generated 2022-06-07)
 Copyright (c) Sergey Bochkanov (ALGLIB project).
 
 >>> SOURCE LICENSE >>>
@@ -272,6 +272,82 @@ void raddvx_fma(const ae_int_t n, const double alpha, const double* __restrict y
         return;
     }
     }
+}
+
+void rmuladdv_fma(const ae_int_t n,
+     const double* __restrict y,
+     const double* __restrict z,
+     double* __restrict x,
+     const ae_state* _state)
+{
+    ae_int_t i;
+    const ae_int_t avx2len = n>>2;
+    const __m256d* __restrict pSrc0 = (const __m256d*)y;
+    const __m256d* __restrict pSrc1 = (const __m256d*)z;
+    __m256d* __restrict pDest = (__m256d*)x;
+    for(i=0; i<avx2len; i++)
+        pDest[i] = _mm256_fmadd_pd(pSrc0[i], pSrc1[i], pDest[i]);
+    const ae_int_t tail = avx2len<<2;
+    for(i=tail; i<n; i++)
+        x[i] += y[i]*z[i];
+}
+
+void rnegmuladdv_fma(const ae_int_t n,
+     const double* __restrict y,
+     const double* __restrict z,
+     double* __restrict x,
+     const ae_state* _state)
+{
+    ae_int_t i;
+    const ae_int_t avx2len = n>>2;
+    const __m256d* __restrict pSrc0 = (const __m256d*)y;
+    const __m256d* __restrict pSrc1 = (const __m256d*)z;
+    __m256d* __restrict pDest = (__m256d*)x;
+    for(i=0; i<avx2len; i++)
+        pDest[i] = _mm256_fnmadd_pd(pSrc0[i], pSrc1[i], pDest[i]);
+    const ae_int_t tail = avx2len<<2;
+    for(i=tail; i<n; i++)
+        x[i] -= y[i]*z[i];
+}
+
+void rcopymuladdv_fma(const ae_int_t n,
+     const double* __restrict y,
+     const double* __restrict z,
+     const double* __restrict x,
+     double* __restrict r,
+     const ae_state* _state)
+{
+    ae_int_t i;
+    const ae_int_t avx2len = n>>2;
+    const __m256d* __restrict pSrc0 = (const __m256d*)y;
+    const __m256d* __restrict pSrc1 = (const __m256d*)z;
+    const __m256d* __restrict pSrc2 = (const __m256d*)x;
+    __m256d* __restrict pDest = (__m256d*)r;
+    for(i=0; i<avx2len; i++)
+        pDest[i] = _mm256_fmadd_pd(pSrc0[i], pSrc1[i], pSrc2[i]);
+    const ae_int_t tail = avx2len<<2;
+    for(i=tail; i<n; i++)
+        r[i] = x[i]+y[i]*z[i];
+}
+
+void rcopynegmuladdv_fma(const ae_int_t n,
+     const double* __restrict y,
+     const double* __restrict z,
+     const double* __restrict x,
+     double* __restrict r,
+     const ae_state* _state)
+{
+    ae_int_t i;
+    const ae_int_t avx2len = n>>2;
+    const __m256d* __restrict pSrc0 = (const __m256d*)y;
+    const __m256d* __restrict pSrc1 = (const __m256d*)z;
+    const __m256d* __restrict pSrc2 = (const __m256d*)x;
+    __m256d* __restrict pDest = (__m256d*)r;
+    for(i=0; i<avx2len; i++)
+        pDest[i] = _mm256_fnmadd_pd(pSrc0[i], pSrc1[i], pSrc2[i]);
+    const ae_int_t tail = avx2len<<2;
+    for(i=tail; i<n; i++)
+        r[i] = x[i]-y[i]*z[i];
 }
 
 void rgemv_straight_fma(const ae_int_t m, const ae_int_t n,
@@ -951,17 +1027,14 @@ ae_bool spchol_updatekernel4444_fma(
          */
         for(k=0; k<uheight; k++)
         {
-            __m256d target;
-            
             targetrow = offss+k*4;
             offsk = offsu+k*4;
-            
-            target = _mm256_load_pd(rowstorage+targetrow);
-            target = _mm256_fmadd_pd(_mm256_broadcast_sd(rowstorage+offsk+0),v_w0,target);
-            target = _mm256_fmadd_pd(_mm256_broadcast_sd(rowstorage+offsk+1),v_w1,target);
-            target = _mm256_fmadd_pd(_mm256_broadcast_sd(rowstorage+offsk+2),v_w2,target);
-            target = _mm256_fmadd_pd(_mm256_broadcast_sd(rowstorage+offsk+3),v_w3,target);
-            _mm256_store_pd(rowstorage+targetrow, target);
+            _mm256_store_pd(rowstorage+targetrow,
+                _mm256_fmadd_pd(_mm256_broadcast_sd(rowstorage+offsk+3),v_w3,
+                _mm256_fmadd_pd(_mm256_broadcast_sd(rowstorage+offsk+2),v_w2,
+                _mm256_fmadd_pd(_mm256_broadcast_sd(rowstorage+offsk+1),v_w1,
+                _mm256_fmadd_pd(_mm256_broadcast_sd(rowstorage+offsk+0),v_w0,
+                    _mm256_load_pd(rowstorage+targetrow))))));
         }
     }
     else
@@ -970,22 +1043,15 @@ ae_bool spchol_updatekernel4444_fma(
          * Row scatter is performed, less efficient code using double mapping to determine target row index
          */
         for(k=0; k<=uheight-1; k++)
-        {
-            __m256d v_uk0, v_uk1, v_uk2, v_uk3, target;
-            
+        {   
             targetrow = offss+raw2smap[superrowidx[urbase+k]]*4;
             offsk = offsu+k*4;
-            
-            target = _mm256_load_pd(rowstorage+targetrow);
-            v_uk0 = _mm256_broadcast_sd(rowstorage+offsk+0);
-            v_uk1 = _mm256_broadcast_sd(rowstorage+offsk+1);
-            v_uk2 = _mm256_broadcast_sd(rowstorage+offsk+2);
-            v_uk3 = _mm256_broadcast_sd(rowstorage+offsk+3);
-            target = _mm256_fmadd_pd(v_uk0,v_w0,target);
-            target = _mm256_fmadd_pd(v_uk1,v_w1,target);
-            target = _mm256_fmadd_pd(v_uk2,v_w2,target);
-            target = _mm256_fmadd_pd(v_uk3,v_w3,target);
-            _mm256_store_pd(rowstorage+targetrow, target);
+            _mm256_store_pd(rowstorage+targetrow,
+                _mm256_fmadd_pd(_mm256_broadcast_sd(rowstorage+offsk+3),v_w3,
+                _mm256_fmadd_pd(_mm256_broadcast_sd(rowstorage+offsk+2),v_w2,
+                _mm256_fmadd_pd(_mm256_broadcast_sd(rowstorage+offsk+1),v_w1,
+                _mm256_fmadd_pd(_mm256_broadcast_sd(rowstorage+offsk+0),v_w0,
+                    _mm256_load_pd(rowstorage+targetrow))))));
         }
     }
     return ae_true;

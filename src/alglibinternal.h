@@ -1,5 +1,5 @@
 /*************************************************************************
-ALGLIB 3.18.0 (source code generated 2021-10-25)
+ALGLIB 3.19.0 (source code generated 2022-06-07)
 Copyright (c) Sergey Bochkanov (ALGLIB project).
 
 >>> SOURCE LICENSE >>>
@@ -376,6 +376,7 @@ void countdown(ae_int_t* v, ae_state *_state);
 double possign(double x, ae_state *_state);
 double rmul2(double v0, double v1, ae_state *_state);
 double rmul3(double v0, double v1, double v2, ae_state *_state);
+double rmul4(double v0, double v1, double v2, double v3, ae_state *_state);
 ae_int_t idivup(ae_int_t a, ae_int_t b, ae_state *_state);
 ae_int_t imin2(ae_int_t i0, ae_int_t i1, ae_state *_state);
 ae_int_t imin3(ae_int_t i0, ae_int_t i1, ae_int_t i2, ae_state *_state);
@@ -497,6 +498,10 @@ void tracerownrm1autoprec(/* Real    */ ae_matrix* a,
      ae_int_t j0,
      ae_int_t j1,
      ae_state *_state);
+void tracevectore3(/* Real    */ ae_vector* a,
+     ae_int_t i0,
+     ae_int_t i1,
+     ae_state *_state);
 void tracevectore6(/* Real    */ ae_vector* a,
      ae_int_t i0,
      ae_int_t i1,
@@ -582,6 +587,36 @@ void raddv(ae_int_t n,
      ae_state *_state);
 #endif
 #ifdef ALGLIB_NO_FAST_KERNELS
+void rmuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     ae_state *_state);
+#endif
+#ifdef ALGLIB_NO_FAST_KERNELS
+void rnegmuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     ae_state *_state);
+#endif
+#ifdef ALGLIB_NO_FAST_KERNELS
+void rcopymuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* r,
+     ae_state *_state);
+#endif
+#ifdef ALGLIB_NO_FAST_KERNELS
+void rcopynegmuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* r,
+     ae_state *_state);
+#endif
+#ifdef ALGLIB_NO_FAST_KERNELS
 void raddvx(ae_int_t n,
      double alpha,
      /* Real    */ ae_vector* y,
@@ -619,6 +654,26 @@ void rmergemulvr(ae_int_t n,
 #endif
 #ifdef ALGLIB_NO_FAST_KERNELS
 void rmergemulrv(ae_int_t n,
+     /* Real    */ ae_matrix* y,
+     ae_int_t rowidx,
+     /* Real    */ ae_vector* x,
+     ae_state *_state);
+#endif
+#ifdef ALGLIB_NO_FAST_KERNELS
+void rmergedivv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* x,
+     ae_state *_state);
+#endif
+#ifdef ALGLIB_NO_FAST_KERNELS
+void rmergedivvr(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_matrix* x,
+     ae_int_t rowidx,
+     ae_state *_state);
+#endif
+#ifdef ALGLIB_NO_FAST_KERNELS
+void rmergedivrv(ae_int_t n,
      /* Real    */ ae_matrix* y,
      ae_int_t rowidx,
      /* Real    */ ae_vector* x,
@@ -690,6 +745,15 @@ void rmulv(ae_int_t n,
 #ifdef ALGLIB_NO_FAST_KERNELS
 void rmulr(ae_int_t n,
      double v,
+     /* Real    */ ae_matrix* x,
+     ae_int_t rowidx,
+     ae_state *_state);
+#endif
+#ifdef ALGLIB_NO_FAST_KERNELS
+void rsqrtv(ae_int_t n, /* Real    */ ae_vector* x, ae_state *_state);
+#endif
+#ifdef ALGLIB_NO_FAST_KERNELS
+void rsqrtr(ae_int_t n,
      /* Real    */ ae_matrix* x,
      ae_int_t rowidx,
      ae_state *_state);
@@ -1581,6 +1645,11 @@ void tagsortfast(/* Real    */ ae_vector* a,
      ae_state *_state);
 void tagsortmiddleir(/* Integer */ ae_vector* a,
      /* Real    */ ae_vector* b,
+     ae_int_t offset,
+     ae_int_t n,
+     ae_state *_state);
+void tagsortmiddleii(/* Integer */ ae_vector* a,
+     /* Integer */ ae_vector* b,
      ae_int_t offset,
      ae_int_t n,
      ae_state *_state);

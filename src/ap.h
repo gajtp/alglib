@@ -1,5 +1,5 @@
 /*************************************************************************
-ALGLIB 3.18.0 (source code generated 2021-10-25)
+ALGLIB 3.19.0 (source code generated 2022-06-07)
 Copyright (c) Sergey Bochkanov (ALGLIB project).
 
 >>> SOURCE LICENSE >>>
@@ -1266,6 +1266,22 @@ inclusion of this header file
         #define _ALGLIB_KERNEL_RETURN_AVX2(fname,params) {}
     #endif
     
+    #if defined(_ALGLIB_HAS_FMA_INTRINSICS)
+        #define _ALGLIB_KERNEL_VOID_FMA(fname,params) \
+        {\
+            ae_int_t cached_cpuid = ae_cpuid();\
+            _ALGLIB_KKK_VOID_FMA(fname,params)\
+        }
+        #define _ALGLIB_KERNEL_RETURN_FMA(fname,params) \
+        {\
+            ae_int_t cached_cpuid = ae_cpuid();\
+            _ALGLIB_KKK_RETURN_FMA(fname,params)\
+        }
+    #else
+        #define _ALGLIB_KERNEL_VOID_FMA(fname,params) {}
+        #define _ALGLIB_KERNEL_RETURN_FMA(fname,params) {}
+    #endif
+    
     #ifdef FP_FAST_FMA
         #define APPROX_FMA(x, y, z) fma((x), (y), (z))
     #else
@@ -2434,6 +2450,13 @@ void rmulr(ae_int_t n,
      /* Real    */ ae_matrix* x,
      ae_int_t rowidx,
      ae_state *_state);
+void rsqrtv(ae_int_t n,
+     /* Real    */ ae_vector* x,
+     ae_state *_state);
+void rsqrtr(ae_int_t n,
+     /* Real    */ ae_matrix* x,
+     ae_int_t rowidx,
+     ae_state *_state);
 void rmulvx(ae_int_t n,
      double v,
      /* Real    */ ae_vector* x,
@@ -2470,6 +2493,28 @@ void raddvx(ae_int_t n,
      /* Real    */ ae_vector* x,
      ae_int_t offsx,
      ae_state *_state);
+void rmuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     ae_state *_state);
+void rnegmuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     ae_state *_state);
+void rcopymuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* r,
+     ae_state *_state);
+void rcopynegmuladdv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* z,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* r,
+     ae_state *_state);
 void rmergemulv(ae_int_t n,
      /* Real    */ ae_vector* y,
      /* Real    */ ae_vector* x,
@@ -2480,6 +2525,20 @@ void rmergemulvr(ae_int_t n,
      ae_int_t rowidx,
      ae_state *_state);
 void rmergemulrv(ae_int_t n,
+     /* Real    */ ae_matrix* y,
+     ae_int_t rowidx,
+     /* Real    */ ae_vector* x,
+     ae_state *_state);
+void rmergedivv(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* x,
+     ae_state *_state);
+void rmergedivvr(ae_int_t n,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_matrix* x,
+     ae_int_t rowidx,
+     ae_state *_state);
+void rmergedivrv(ae_int_t n,
      /* Real    */ ae_matrix* y,
      ae_int_t rowidx,
      /* Real    */ ae_vector* x,
@@ -3405,6 +3464,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 
 #ifdef AE_COMPILE_ABLASF
 #define AE_PARTIAL_BUILD
+#define AE_COMPILE_APSERV
 #endif
 
 #ifdef AE_COMPILE_HQRND
@@ -3466,6 +3526,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_TSORT
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #endif
 
 #ifdef AE_COMPILE_SPARSE
@@ -3499,6 +3560,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_BASICSTATOPS
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #endif
 
@@ -3865,9 +3927,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_OPTSERV
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_OPTGUARDAPI
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_CREFLECTIONS
@@ -3897,9 +3959,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_LINMIN
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_OPTGUARDAPI
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_CREFLECTIONS
@@ -4104,9 +4166,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_LINMIN
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_OPTGUARDAPI
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_CREFLECTIONS
@@ -4265,9 +4327,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_MINLM
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_OPTGUARDAPI
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_CREFLECTIONS
@@ -4315,9 +4377,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_LINMIN
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_OPTGUARDAPI
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_CREFLECTIONS
@@ -4462,9 +4524,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_LINMIN
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_OPTGUARDAPI
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_CREFLECTIONS
@@ -4497,9 +4559,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_LINMIN
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_OPTGUARDAPI
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_CREFLECTIONS
@@ -4544,9 +4606,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_LINMIN
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_OPTGUARDAPI
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_CREFLECTIONS
@@ -4582,9 +4644,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_LINMIN
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_OPTGUARDAPI
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_CREFLECTIONS
@@ -4621,9 +4683,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_LINMIN
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_OPTGUARDAPI
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_CREFLECTIONS
@@ -4701,6 +4763,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_SCODES
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #endif
 
@@ -4810,8 +4873,8 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_GKQ
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
-#define AE_COMPILE_TSORT
 #define AE_COMPILE_ABLASF
+#define AE_COMPILE_TSORT
 #define AE_COMPILE_HQRND
 #define AE_COMPILE_HBLAS
 #define AE_COMPILE_CREFLECTIONS
@@ -4834,8 +4897,8 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_AUTOGK
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
-#define AE_COMPILE_TSORT
 #define AE_COMPILE_ABLASF
+#define AE_COMPILE_TSORT
 #define AE_COMPILE_HQRND
 #define AE_COMPILE_HBLAS
 #define AE_COMPILE_CREFLECTIONS
@@ -4885,9 +4948,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_BASESTAT
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_BASICSTATOPS
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #endif
@@ -5007,6 +5070,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_RATINT
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #endif
 
@@ -5014,9 +5078,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_SCODES
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_NEARESTNEIGHBOR
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_HQRND
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
@@ -5045,6 +5109,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_POLINT
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_RATINT
 #endif
@@ -5052,8 +5117,8 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_SPLINE1D
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
-#define AE_COMPILE_TSORT
 #define AE_COMPILE_ABLASF
+#define AE_COMPILE_TSORT
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_SCODES
@@ -5137,9 +5202,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_LINMIN
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_OPTGUARDAPI
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_CREFLECTIONS
@@ -5230,9 +5295,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_SCODES
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_NEARESTNEIGHBOR
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_HQRND
@@ -5282,6 +5347,36 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_LSFIT
 #endif
 
+#ifdef AE_COMPILE_RBFV3
+#define AE_PARTIAL_BUILD
+#define AE_COMPILE_SCODES
+#define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
+#define AE_COMPILE_TSORT
+#define AE_COMPILE_NEARESTNEIGHBOR
+#define AE_COMPILE_ABLASMKL
+#define AE_COMPILE_ABLAS
+#define AE_COMPILE_HQRND
+#define AE_COMPILE_SPARSE
+#define AE_COMPILE_DLU
+#define AE_COMPILE_SPTRF
+#define AE_COMPILE_AMDORDERING
+#define AE_COMPILE_SPCHOL
+#define AE_COMPILE_CREFLECTIONS
+#define AE_COMPILE_MATGEN
+#define AE_COMPILE_ROTATIONS
+#define AE_COMPILE_TRFAC
+#define AE_COMPILE_TRLINSOLVE
+#define AE_COMPILE_SAFESOLVE
+#define AE_COMPILE_RCOND
+#define AE_COMPILE_DIRECTSPARSESOLVERS
+#define AE_COMPILE_HBLAS
+#define AE_COMPILE_SBLAS
+#define AE_COMPILE_ORTFAC
+#define AE_COMPILE_FBLS
+#define AE_COMPILE_ITERATIVESPARSE
+#endif
+
 #ifdef AE_COMPILE_SPLINE2D
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
@@ -5317,9 +5412,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_SCODES
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_NEARESTNEIGHBOR
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_HQRND
@@ -5372,8 +5467,8 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_SPLINE3D
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
-#define AE_COMPILE_TSORT
 #define AE_COMPILE_ABLASF
+#define AE_COMPILE_TSORT
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_SCODES
@@ -5404,9 +5499,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_LINMIN
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_OPTGUARDAPI
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_CREFLECTIONS
@@ -5462,9 +5557,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_SCODES
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_NEARESTNEIGHBOR
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_HQRND
@@ -5514,6 +5609,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_LSFIT
 #define AE_COMPILE_RBFV1
 #define AE_COMPILE_RBFV2
+#define AE_COMPILE_DIRECTSPARSESOLVERS
+#define AE_COMPILE_ITERATIVESPARSE
+#define AE_COMPILE_RBFV3
 #endif
 
 #ifdef AE_COMPILE_NTHEORY
@@ -5653,9 +5751,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_BDSS
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_BASICSTATOPS
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_BASESTAT
@@ -5668,9 +5766,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_MLPBASE
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_BASICSTATOPS
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_BASESTAT
@@ -5684,9 +5782,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_MLPE
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_BASICSTATOPS
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_BASESTAT
@@ -5701,8 +5799,8 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_CLUSTERING
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
-#define AE_COMPILE_TSORT
 #define AE_COMPILE_ABLASF
+#define AE_COMPILE_TSORT
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_HQRND
@@ -5715,8 +5813,8 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
 #define AE_COMPILE_SCODES
-#define AE_COMPILE_TSORT
 #define AE_COMPILE_ABLASF
+#define AE_COMPILE_TSORT
 #define AE_COMPILE_HQRND
 #define AE_COMPILE_BASICSTATOPS
 #define AE_COMPILE_ABLASMKL
@@ -5728,9 +5826,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_LINREG
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_BASICSTATOPS
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_BASESTAT
@@ -5751,9 +5849,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_FILTERS
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_BASICSTATOPS
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_BASESTAT
@@ -5831,9 +5929,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
 #define AE_COMPILE_LINMIN
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_OPTGUARDAPI
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_CREFLECTIONS
@@ -5868,9 +5966,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_LOGIT
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_BASICSTATOPS
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_BASESTAT
@@ -5905,8 +6003,8 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
 #define AE_COMPILE_SCODES
-#define AE_COMPILE_TSORT
 #define AE_COMPILE_ABLASF
+#define AE_COMPILE_TSORT
 #define AE_COMPILE_HQRND
 #define AE_COMPILE_NEARESTNEIGHBOR
 #define AE_COMPILE_BASICSTATOPS
@@ -5919,9 +6017,9 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_MLPTRAIN
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_BASICSTATOPS
-#define AE_COMPILE_ABLASF
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_BASESTAT
@@ -5962,8 +6060,8 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #ifdef AE_COMPILE_DATACOMP
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
-#define AE_COMPILE_TSORT
 #define AE_COMPILE_ABLASF
+#define AE_COMPILE_TSORT
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_HQRND

@@ -1,5 +1,5 @@
 /*************************************************************************
-ALGLIB 3.18.0 (source code generated 2021-10-25)
+ALGLIB 3.19.0 (source code generated 2022-06-07)
 Copyright (c) Sergey Bochkanov (ALGLIB project).
 
 >>> SOURCE LICENSE >>>
@@ -73,6 +73,10 @@ namespace alglib
 #endif
 
 #if defined(AE_COMPILE_RBFV1) || !defined(AE_PARTIAL_BUILD)
+
+#endif
+
+#if defined(AE_COMPILE_RBFV3) || !defined(AE_PARTIAL_BUILD)
 
 #endif
 
@@ -11992,6 +11996,10 @@ void parametricrdpfixed(const real_2d_array &x, const ae_int_t n, const ae_int_t
 
 #endif
 
+#if defined(AE_COMPILE_RBFV3) || !defined(AE_PARTIAL_BUILD)
+
+#endif
+
 #if defined(AE_COMPILE_SPLINE2D) || !defined(AE_PARTIAL_BUILD)
 /*************************************************************************
 2-dimensional spline inteprolant
@@ -14590,10 +14598,10 @@ void spline1dfitpenalizedw(const real_1d_array &x, const real_1d_array &y, const
 
 #if defined(AE_COMPILE_RBF) || !defined(AE_PARTIAL_BUILD)
 /*************************************************************************
-Buffer object which is used to perform nearest neighbor  requests  in  the
-multithreaded mode (multiple threads working with same KD-tree object).
+Buffer object which is used  to  perform  RBF  model  calculation  in  the
+multithreaded mode (multiple threads working with same RBF object).
 
-This object should be created with KDTreeCreateBuffer().
+This object should be created with RBFCreateCalcBuffer().
 *************************************************************************/
 _rbfcalcbuffer_owner::_rbfcalcbuffer_owner()
 {
@@ -15142,30 +15150,28 @@ rbfbuildmodel() which will update model according to your specification.
 
 USAGE:
 1. User creates model with rbfcreate()
-2. User adds dataset with rbfsetpoints() (points do NOT have to  be  on  a
-   regular grid) or rbfsetpointsandscales().
-3. (OPTIONAL) User chooses polynomial term by calling:
-   * rbflinterm() to set linear term
+2. User adds dataset with rbfsetpoints() or rbfsetpointsandscales()
+3. User selects RBF solver by calling:
+   * rbfsetalgohierarchical() - for a HRBF solver,  a  hierarchical large-
+     scale Gaussian RBFs  (works  well  for  uniformly  distributed  point
+     clouds, but may fail when the data are non-uniform; use other solvers
+     below in such cases)
+   * rbfsetalgothinplatespline() - for a large-scale DDM-RBF  solver  with
+     thin plate spline basis function being used
+   * rbfsetalgobiharmonic() -  for  a  large-scale  DDM-RBF  solver   with
+     biharmonic basis function being used
+   * rbfsetalgomultiquadricauto() -  for a large-scale DDM-RBF solver with
+     multiquadric basis function being used (automatic  selection  of  the
+     scale parameter Alpha)
+   * rbfsetalgomultiquadricmanual() -  for a  large-scale  DDM-RBF  solver
+     with multiquadric basis function being used (manual selection  of the
+     scale parameter Alpha)
+4. (OPTIONAL) User chooses polynomial term by calling:
+   * rbflinterm() to set linear term (default)
    * rbfconstterm() to set constant term
    * rbfzeroterm() to set zero term
-   By default, linear term is used.
-4. User tweaks algorithm properties with  rbfsetalgohierarchical()  method
-   (or chooses one of the legacy algorithms - QNN  (rbfsetalgoqnn)  or  ML
-   (rbfsetalgomultilayer)).
 5. User calls rbfbuildmodel() function which rebuilds model  according  to
    the specification
-6. User may call rbfcalc() to calculate model value at the specified point,
-   rbfgridcalc() to  calculate   model  values at the points of the regular
-   grid. User may extract model coefficients with rbfunpack() call.
-
-IMPORTANT: we recommend you to use latest model construction  algorithm  -
-           hierarchical RBFs, which is activated by rbfsetalgohierarchical()
-           function. This algorithm is the fastest one, and  most  memory-
-           efficient.
-           However,  it  is  incompatible  with older versions  of  ALGLIB
-           (pre-3.11). So, if you serialize hierarchical model,  you  will
-           be unable to load it in pre-3.11 ALGLIB. Other model types (QNN
-           and RBF-ML) are still backward-compatible.
 
 INPUT PARAMETERS:
     NX      -   dimension of the space, NX>=1
@@ -15177,26 +15183,9 @@ OUTPUT PARAMETERS:
 NOTE 1: memory requirements. RBF models require amount of memory  which is
         proportional  to the number of data points. Some additional memory
         is allocated during model construction, but most of this memory is
-        freed after model coefficients  are  calculated.  Amount  of  this
-        additional memory depends on model  construction  algorithm  being
-        used.
-
-NOTE 2: prior to ALGLIB version 3.11, RBF models supported  only  NX=2  or
-        NX=3. Any  attempt  to  create  single-dimensional  or  more  than
-        3-dimensional RBF model resulted in exception.
-
-        ALGLIB 3.11 supports any NX>0, but models created with  NX!=2  and
-        NX!=3 are incompatible with (a) older versions of ALGLIB, (b)  old
-        model construction algorithms (QNN or RBF-ML).
-
-        So, if you create a model with NX=2 or NX=3,  then,  depending  on
-        specific  model construction algorithm being chosen, you will (QNN
-        and RBF-ML) or will not (HierarchicalRBF) get backward compatibility
-        with older versions of ALGLIB. You have a choice here.
-
-        However, if you create a model with NX neither 2 nor 3,  you  have
-        no backward compatibility from the start, and you  are  forced  to
-        use hierarchical RBFs and ALGLIB 3.11 or later.
+        freed after the model  coefficients  are   calculated.  Amount  of
+        this additional memory depends  on  model  construction  algorithm
+        being used.
 
   -- ALGLIB --
      Copyright 13.12.2011, 20.06.2016 by Bochkanov Sergey
@@ -15227,11 +15216,21 @@ void rbfcreate(const ae_int_t nx, const ae_int_t ny, rbfmodel &s, const xparams 
 This function creates buffer  structure  which  can  be  used  to  perform
 parallel  RBF  model  evaluations  (with  one  RBF  model  instance  being
 used from multiple threads, as long as  different  threads  use  different
-instances of buffer).
+instances of the buffer).
 
 This buffer object can be used with  rbftscalcbuf()  function  (here  "ts"
 stands for "thread-safe", "buf" is a suffix which denotes  function  which
 reuses previously allocated output space).
+
+A buffer creation function (this function) is also thread-safe.  I.e.  you
+may safely create multiple buffers for the same  RBF  model  from multiple
+threads.
+
+NOTE: the  buffer  object  is  just  a  collection of several preallocated
+      dynamic arrays and precomputed values. If you  delete  its  "parent"
+      RBF model when the buffer is still alive, nothing  bad  will  happen
+      (no dangling pointers or resource leaks).  The  buffer  will  simply
+      become useless.
 
 How to use it:
 * create RBF model structure with rbfcreate()
@@ -15242,13 +15241,15 @@ How to use it:
   for more information)
 * call rbftscalcbuf() from different threads,  with  each  thread  working
   with its own copy of buffer object.
+* it is recommended to reuse buffer as much  as  possible  because  buffer
+  creation involves allocation of several large dynamic arrays.  It  is  a
+  huge waste of resource to use it just once.
 
 INPUT PARAMETERS
     S           -   RBF model
 
 OUTPUT PARAMETERS
     Buf         -   external buffer.
-
 
 IMPORTANT: buffer object should be used only with  RBF model object  which
            was used to initialize buffer. Any attempt to use buffer   with
@@ -15425,14 +15426,9 @@ scale vector.
 This function overrides results of the previous calls, i.e. multiple calls
 of this function will result in only the last set being added.
 
-IMPORTANT: only HierarchicalRBF algorithm can work with scaled points. So,
-           using this function results in RBF models which can be used  in
-           ALGLIB 3.11 or later. Previous versions of the library will  be
-           unable  to unserialize models produced by HierarchicalRBF algo.
-
-           Any attempt to use this function with RBF-ML or QNN  algorithms
-           will result  in  -3  error  code   being   returned  (incorrect
-           algorithm).
+IMPORTANT: only modern RBF algorithms  support  variable  scaling.  Legacy
+           algorithms like RBF-ML or QNN algorithms  will  result  in   -3
+           completion code being returned (incorrect algorithm).
 
 INPUT PARAMETERS:
     R       -   RBF model, initialized by rbfcreate() call.
@@ -15497,14 +15493,9 @@ scale vector.
 This function overrides results of the previous calls, i.e. multiple calls
 of this function will result in only the last set being added.
 
-IMPORTANT: only HierarchicalRBF algorithm can work with scaled points. So,
-           using this function results in RBF models which can be used  in
-           ALGLIB 3.11 or later. Previous versions of the library will  be
-           unable  to unserialize models produced by HierarchicalRBF algo.
-
-           Any attempt to use this function with RBF-ML or QNN  algorithms
-           will result  in  -3  error  code   being   returned  (incorrect
-           algorithm).
+IMPORTANT: only modern RBF algorithms  support  variable  scaling.  Legacy
+           algorithms like RBF-ML or QNN algorithms  will  result  in   -3
+           completion code being returned (incorrect algorithm).
 
 INPUT PARAMETERS:
     R       -   RBF model, initialized by rbfcreate() call.
@@ -15557,62 +15548,9 @@ void rbfsetpointsandscales(const rbfmodel &r, const real_2d_array &xy, const rea
 #endif
 
 /*************************************************************************
-DEPRECATED:since version 3.11 ALGLIB includes new RBF  model  construction
-           algorithm, Hierarchical  RBF.  This  algorithm  is  faster  and
-           requires less memory than QNN and RBF-ML. It is especially good
-           for large-scale interpolation problems. So, we recommend you to
-           consider Hierarchical RBF as default option.
-
-==========================================================================
-
-This  function  sets  RBF interpolation algorithm. ALGLIB supports several
-RBF algorithms with different properties.
-
-This algorithm is called RBF-QNN and  it  is  good  for  point  sets  with
-following properties:
-a) all points are distinct
-b) all points are well separated.
-c) points  distribution  is  approximately  uniform.  There is no "contour
-   lines", clusters of points, or other small-scale structures.
-
-Algorithm description:
-1) interpolation centers are allocated to data points
-2) interpolation radii are calculated as distances to the  nearest centers
-   times Q coefficient (where Q is a value from [0.75,1.50]).
-3) after  performing (2) radii are transformed in order to avoid situation
-   when single outlier has very large radius and  influences  many  points
-   across all dataset. Transformation has following form:
-       new_r[i] = min(r[i],Z*median(r[]))
-   where r[i] is I-th radius, median()  is a median  radius across  entire
-   dataset, Z is user-specified value which controls amount  of  deviation
-   from median radius.
-
-When (a) is violated,  we  will  be unable to build RBF model. When (b) or
-(c) are violated, model will be built, but interpolation quality  will  be
-low. See http://www.alglib.net/interpolation/ for more information on this
-subject.
-
-This algorithm is used by default.
-
-Additional Q parameter controls smoothness properties of the RBF basis:
-* Q<0.75 will give perfectly conditioned basis,  but  terrible  smoothness
-  properties (RBF interpolant will have sharp peaks around function values)
-* Q around 1.0 gives good balance between smoothness and condition number
-* Q>1.5 will lead to badly conditioned systems and slow convergence of the
-  underlying linear solver (although smoothness will be very good)
-* Q>2.0 will effectively make optimizer useless because it won't  converge
-  within reasonable amount of iterations. It is possible to set such large
-  Q, but it is advised not to do so.
-
-INPUT PARAMETERS:
-    S       -   RBF model, initialized by RBFCreate() call
-    Q       -   Q parameter, Q>0, recommended value - 1.0
-    Z       -   Z parameter, Z>0, recommended value - 5.0
-
-NOTE: this   function  has   some   serialization-related  subtleties.  We
-      recommend you to study serialization examples from ALGLIB  Reference
-      Manual if you want to perform serialization of your models.
-
+DEPRECATED: this function is deprecated. ALGLIB  includes  new  RBF  model
+            construction algorithms: DDM-RBF (since version 3.19) and HRBF
+            (since version 3.11).
 
   -- ALGLIB --
      Copyright 13.12.2011 by Bochkanov Sergey
@@ -15640,62 +15578,9 @@ void rbfsetalgoqnn(const rbfmodel &s, const double q, const double z, const xpar
 }
 
 /*************************************************************************
-DEPRECATED:since version 3.11 ALGLIB includes new RBF  model  construction
-           algorithm, Hierarchical  RBF.  This  algorithm  is  faster  and
-           requires less memory than QNN and RBF-ML. It is especially good
-           for large-scale interpolation problems. So, we recommend you to
-           consider Hierarchical RBF as default option.
-
-==========================================================================
-
-This  function  sets  RBF interpolation algorithm. ALGLIB supports several
-RBF algorithms with different properties.
-
-This algorithm is called RBF-QNN and  it  is  good  for  point  sets  with
-following properties:
-a) all points are distinct
-b) all points are well separated.
-c) points  distribution  is  approximately  uniform.  There is no "contour
-   lines", clusters of points, or other small-scale structures.
-
-Algorithm description:
-1) interpolation centers are allocated to data points
-2) interpolation radii are calculated as distances to the  nearest centers
-   times Q coefficient (where Q is a value from [0.75,1.50]).
-3) after  performing (2) radii are transformed in order to avoid situation
-   when single outlier has very large radius and  influences  many  points
-   across all dataset. Transformation has following form:
-       new_r[i] = min(r[i],Z*median(r[]))
-   where r[i] is I-th radius, median()  is a median  radius across  entire
-   dataset, Z is user-specified value which controls amount  of  deviation
-   from median radius.
-
-When (a) is violated,  we  will  be unable to build RBF model. When (b) or
-(c) are violated, model will be built, but interpolation quality  will  be
-low. See http://www.alglib.net/interpolation/ for more information on this
-subject.
-
-This algorithm is used by default.
-
-Additional Q parameter controls smoothness properties of the RBF basis:
-* Q<0.75 will give perfectly conditioned basis,  but  terrible  smoothness
-  properties (RBF interpolant will have sharp peaks around function values)
-* Q around 1.0 gives good balance between smoothness and condition number
-* Q>1.5 will lead to badly conditioned systems and slow convergence of the
-  underlying linear solver (although smoothness will be very good)
-* Q>2.0 will effectively make optimizer useless because it won't  converge
-  within reasonable amount of iterations. It is possible to set such large
-  Q, but it is advised not to do so.
-
-INPUT PARAMETERS:
-    S       -   RBF model, initialized by RBFCreate() call
-    Q       -   Q parameter, Q>0, recommended value - 1.0
-    Z       -   Z parameter, Z>0, recommended value - 5.0
-
-NOTE: this   function  has   some   serialization-related  subtleties.  We
-      recommend you to study serialization examples from ALGLIB  Reference
-      Manual if you want to perform serialization of your models.
-
+DEPRECATED: this function is deprecated. ALGLIB  includes  new  RBF  model
+            construction algorithms: DDM-RBF (since version 3.19) and HRBF
+            (since version 3.11).
 
   -- ALGLIB --
      Copyright 13.12.2011 by Bochkanov Sergey
@@ -15724,99 +15609,9 @@ void rbfsetalgoqnn(const rbfmodel &s, const xparams _xparams)
 #endif
 
 /*************************************************************************
-DEPRECATED:since version 3.11 ALGLIB includes new RBF  model  construction
-           algorithm, Hierarchical  RBF.  This  algorithm  is  faster  and
-           requires less memory than QNN and RBF-ML. It is especially good
-           for large-scale interpolation problems. So, we recommend you to
-           consider Hierarchical RBF as default option.
-
-==========================================================================
-
-This  function  sets  RBF interpolation algorithm. ALGLIB supports several
-RBF algorithms with different properties.
-
-This  algorithm is called RBF-ML. It builds  multilayer  RBF  model,  i.e.
-model with subsequently decreasing  radii,  which  allows  us  to  combine
-smoothness (due to  large radii of  the first layers) with  exactness (due
-to small radii of the last layers) and fast convergence.
-
-Internally RBF-ML uses many different  means  of acceleration, from sparse
-matrices  to  KD-trees,  which  results in algorithm whose working time is
-roughly proportional to N*log(N)*Density*RBase^2*NLayers,  where  N  is  a
-number of points, Density is an average density if points per unit of  the
-interpolation space, RBase is an initial radius, NLayers is  a  number  of
-layers.
-
-RBF-ML is good for following kinds of interpolation problems:
-1. "exact" problems (perfect fit) with well separated points
-2. least squares problems with arbitrary distribution of points (algorithm
-   gives  perfect  fit  where it is possible, and resorts to least squares
-   fit in the hard areas).
-3. noisy problems where  we  want  to  apply  some  controlled  amount  of
-   smoothing.
-
-INPUT PARAMETERS:
-    S       -   RBF model, initialized by RBFCreate() call
-    RBase   -   RBase parameter, RBase>0
-    NLayers -   NLayers parameter, NLayers>0, recommended value  to  start
-                with - about 5.
-    LambdaV -   regularization value, can be useful when  solving  problem
-                in the least squares sense.  Optimal  lambda  is  problem-
-                dependent and require trial and error. In our  experience,
-                good lambda can be as large as 0.1, and you can use  0.001
-                as initial guess.
-                Default  value  - 0.01, which is used when LambdaV is  not
-                given.  You  can  specify  zero  value,  but  it  is   not
-                recommended to do so.
-
-TUNING ALGORITHM
-
-In order to use this algorithm you have to choose three parameters:
-* initial radius RBase
-* number of layers in the model NLayers
-* regularization coefficient LambdaV
-
-Initial radius is easy to choose - you can pick any number  several  times
-larger  than  the  average  distance between points. Algorithm won't break
-down if you choose radius which is too large (model construction time will
-increase, but model will be built correctly).
-
-Choose such number of layers that RLast=RBase/2^(NLayers-1)  (radius  used
-by  the  last  layer)  will  be  smaller than the typical distance between
-points.  In  case  model  error  is  too large, you can increase number of
-layers.  Having  more  layers  will make model construction and evaluation
-proportionally slower, but it will allow you to have model which precisely
-fits your data. From the other side, if you want to  suppress  noise,  you
-can DECREASE number of layers to make your model less flexible.
-
-Regularization coefficient LambdaV controls smoothness of  the  individual
-models built for each layer. We recommend you to use default value in case
-you don't want to tune this parameter,  because  having  non-zero  LambdaV
-accelerates and stabilizes internal iterative algorithm. In case you  want
-to suppress noise you can use  LambdaV  as  additional  parameter  (larger
-value = more smoothness) to tune.
-
-TYPICAL ERRORS
-
-1. Using  initial  radius  which is too large. Memory requirements  of the
-   RBF-ML are roughly proportional to N*Density*RBase^2 (where Density  is
-   an average density of points per unit of the interpolation  space).  In
-   the extreme case of the very large RBase we will need O(N^2)  units  of
-   memory - and many layers in order to decrease radius to some reasonably
-   small value.
-
-2. Using too small number of layers - RBF models with large radius are not
-   flexible enough to reproduce small variations in the  target  function.
-   You  need  many  layers  with  different radii, from large to small, in
-   order to have good model.
-
-3. Using  initial  radius  which  is  too  small.  You will get model with
-   "holes" in the areas which are too far away from interpolation centers.
-   However, algorithm will work correctly (and quickly) in this case.
-
-4. Using too many layers - you will get too large and too slow model. This
-   model  will  perfectly  reproduce  your function, but maybe you will be
-   able to achieve similar results with less layers (and less memory).
+DEPRECATED: this function is deprecated. ALGLIB  includes  new  RBF  model
+            construction algorithms: DDM-RBF (since version 3.19) and HRBF
+            (since version 3.11).
 
   -- ALGLIB --
      Copyright 02.03.2012 by Bochkanov Sergey
@@ -15844,99 +15639,9 @@ void rbfsetalgomultilayer(const rbfmodel &s, const double rbase, const ae_int_t 
 }
 
 /*************************************************************************
-DEPRECATED:since version 3.11 ALGLIB includes new RBF  model  construction
-           algorithm, Hierarchical  RBF.  This  algorithm  is  faster  and
-           requires less memory than QNN and RBF-ML. It is especially good
-           for large-scale interpolation problems. So, we recommend you to
-           consider Hierarchical RBF as default option.
-
-==========================================================================
-
-This  function  sets  RBF interpolation algorithm. ALGLIB supports several
-RBF algorithms with different properties.
-
-This  algorithm is called RBF-ML. It builds  multilayer  RBF  model,  i.e.
-model with subsequently decreasing  radii,  which  allows  us  to  combine
-smoothness (due to  large radii of  the first layers) with  exactness (due
-to small radii of the last layers) and fast convergence.
-
-Internally RBF-ML uses many different  means  of acceleration, from sparse
-matrices  to  KD-trees,  which  results in algorithm whose working time is
-roughly proportional to N*log(N)*Density*RBase^2*NLayers,  where  N  is  a
-number of points, Density is an average density if points per unit of  the
-interpolation space, RBase is an initial radius, NLayers is  a  number  of
-layers.
-
-RBF-ML is good for following kinds of interpolation problems:
-1. "exact" problems (perfect fit) with well separated points
-2. least squares problems with arbitrary distribution of points (algorithm
-   gives  perfect  fit  where it is possible, and resorts to least squares
-   fit in the hard areas).
-3. noisy problems where  we  want  to  apply  some  controlled  amount  of
-   smoothing.
-
-INPUT PARAMETERS:
-    S       -   RBF model, initialized by RBFCreate() call
-    RBase   -   RBase parameter, RBase>0
-    NLayers -   NLayers parameter, NLayers>0, recommended value  to  start
-                with - about 5.
-    LambdaV -   regularization value, can be useful when  solving  problem
-                in the least squares sense.  Optimal  lambda  is  problem-
-                dependent and require trial and error. In our  experience,
-                good lambda can be as large as 0.1, and you can use  0.001
-                as initial guess.
-                Default  value  - 0.01, which is used when LambdaV is  not
-                given.  You  can  specify  zero  value,  but  it  is   not
-                recommended to do so.
-
-TUNING ALGORITHM
-
-In order to use this algorithm you have to choose three parameters:
-* initial radius RBase
-* number of layers in the model NLayers
-* regularization coefficient LambdaV
-
-Initial radius is easy to choose - you can pick any number  several  times
-larger  than  the  average  distance between points. Algorithm won't break
-down if you choose radius which is too large (model construction time will
-increase, but model will be built correctly).
-
-Choose such number of layers that RLast=RBase/2^(NLayers-1)  (radius  used
-by  the  last  layer)  will  be  smaller than the typical distance between
-points.  In  case  model  error  is  too large, you can increase number of
-layers.  Having  more  layers  will make model construction and evaluation
-proportionally slower, but it will allow you to have model which precisely
-fits your data. From the other side, if you want to  suppress  noise,  you
-can DECREASE number of layers to make your model less flexible.
-
-Regularization coefficient LambdaV controls smoothness of  the  individual
-models built for each layer. We recommend you to use default value in case
-you don't want to tune this parameter,  because  having  non-zero  LambdaV
-accelerates and stabilizes internal iterative algorithm. In case you  want
-to suppress noise you can use  LambdaV  as  additional  parameter  (larger
-value = more smoothness) to tune.
-
-TYPICAL ERRORS
-
-1. Using  initial  radius  which is too large. Memory requirements  of the
-   RBF-ML are roughly proportional to N*Density*RBase^2 (where Density  is
-   an average density of points per unit of the interpolation  space).  In
-   the extreme case of the very large RBase we will need O(N^2)  units  of
-   memory - and many layers in order to decrease radius to some reasonably
-   small value.
-
-2. Using too small number of layers - RBF models with large radius are not
-   flexible enough to reproduce small variations in the  target  function.
-   You  need  many  layers  with  different radii, from large to small, in
-   order to have good model.
-
-3. Using  initial  radius  which  is  too  small.  You will get model with
-   "holes" in the areas which are too far away from interpolation centers.
-   However, algorithm will work correctly (and quickly) in this case.
-
-4. Using too many layers - you will get too large and too slow model. This
-   model  will  perfectly  reproduce  your function, but maybe you will be
-   able to achieve similar results with less layers (and less memory).
+DEPRECATED: this function is deprecated. ALGLIB  includes  new  RBF  model
+            construction algorithms: DDM-RBF (since version 3.19) and HRBF
+            (since version 3.11).
 
   -- ALGLIB --
      Copyright 02.03.2012 by Bochkanov Sergey
@@ -15963,8 +15668,7 @@ void rbfsetalgomultilayer(const rbfmodel &s, const double rbase, const ae_int_t 
 #endif
 
 /*************************************************************************
-This  function  sets  RBF interpolation algorithm. ALGLIB supports several
-RBF algorithms with different properties.
+This function chooses HRBF solver, a 2nd version of ALGLIB RBFs.
 
 This  algorithm is called Hierarchical RBF. It  similar  to  its  previous
 incarnation, RBF-ML, i.e.  it  also  builds  a  sequence  of  models  with
@@ -15975,22 +15679,16 @@ and evaluation, as well as smaller memory footprint during construction.
 This algorithm has following important features:
 * ability to handle millions of points
 * controllable smoothing via nonlinearity penalization
-* support for NX-dimensional models with NX=1 or NX>3 (unlike QNN or RBF-ML)
 * support for specification of per-dimensional  radii  via  scale  vector,
   which is set by means of rbfsetpointsandscales() function. This  feature
   is useful if you solve  spatio-temporal  interpolation  problems,  where
   different radii are required for spatial and temporal dimensions.
 
 Running times are roughly proportional to:
-* N*log(N)*NLayers - for model construction
-* N*NLayers - for model evaluation
+* N*log(N)*NLayers - for the model construction
+* N*NLayers - for the model evaluation
 You may see that running time does not depend on search radius  or  points
-density, just on number of layers in the hierarchy.
-
-IMPORTANT: this model construction algorithm was introduced in ALGLIB 3.11
-           and  produces  models  which  are  INCOMPATIBLE  with  previous
-           versions of ALGLIB. You can  not  unserialize  models  produced
-           with this function in ALGLIB 3.10 or earlier.
+density, just on the number of layers in the hierarchy.
 
 INPUT PARAMETERS:
     S       -   RBF model, initialized by rbfcreate() call
@@ -16076,16 +15774,630 @@ void rbfsetalgohierarchical(const rbfmodel &s, const double rbase, const ae_int_
 }
 
 /*************************************************************************
+This function chooses a thin plate  spline  DDM-RBF  solver,  a  fast  RBF
+solver with f(r)=r^2*ln(r) basis function.
+
+This algorithm has following important features:
+* easy setup - no tunable parameters
+* C1 continuous RBF model (gradient is defined everywhere, but Hessian  is
+  undefined at nodes), high-quality interpolation
+* fast  model construction algorithm with O(N) memory and  O(N^2)  running
+  time requirements. Hundreds of thousands of points can be  handled  with
+  this algorithm.
+* controllable smoothing via optional nonlinearity penalty
+
+INPUT PARAMETERS:
+    S       -   RBF model, initialized by rbfcreate() call
+    LambdaV -   smoothing parameter, LambdaV>=0, defaults to 0.0:
+                * LambdaV=0 means that no smoothing is applied,  i.e.  the
+                  spline tries to pass through all dataset points exactly
+                * LambdaV>0 means that a smoothing thin  plate  spline  is
+                  built, with larger LambdaV corresponding to models  with
+                  less nonlinearities. Smoothing spline reproduces  target
+                  values at nodes with small error; from the  other  side,
+                  it is much more stable.
+                  Recommended values:
+                  * 1.0E-6 for minimal stability improving smoothing
+                  * 1.0E-3 a good value to start experiments; first results
+                    are visible
+                  * 1.0 for strong smoothing
+
+IMPORTANT: this model construction algorithm was introduced in ALGLIB 3.19
+           and  produces  models  which  are  INCOMPATIBLE  with  previous
+           versions of ALGLIB. You can  not  unserialize  models  produced
+           with this function in ALGLIB 3.18 or earlier.
+
+NOTE:      polyharmonic RBFs, including thin plate splines,  are  somewhat
+           slower than compactly supported RBFs built with  HRBF algorithm
+           due to the fact that non-compact basis function does not vanish
+           far away from the nodes. From the other side, polyharmonic RBFs
+           often produce much better results than HRBFs.
+
+NOTE:      this algorithm supports specification of per-dimensional  radii
+           via scale vector, which is set by means of rbfsetpointsandscales()
+           function. This feature is useful if  you solve  spatio-temporal
+           interpolation problems where different radii are  required  for
+           spatial and temporal dimensions.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfsetalgothinplatespline(const rbfmodel &s, const double lambdav, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbfsetalgothinplatespline(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), lambdav, &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+
+/*************************************************************************
+This function chooses a thin plate  spline  DDM-RBF  solver,  a  fast  RBF
+solver with f(r)=r^2*ln(r) basis function.
+
+This algorithm has following important features:
+* easy setup - no tunable parameters
+* C1 continuous RBF model (gradient is defined everywhere, but Hessian  is
+  undefined at nodes), high-quality interpolation
+* fast  model construction algorithm with O(N) memory and  O(N^2)  running
+  time requirements. Hundreds of thousands of points can be  handled  with
+  this algorithm.
+* controllable smoothing via optional nonlinearity penalty
+
+INPUT PARAMETERS:
+    S       -   RBF model, initialized by rbfcreate() call
+    LambdaV -   smoothing parameter, LambdaV>=0, defaults to 0.0:
+                * LambdaV=0 means that no smoothing is applied,  i.e.  the
+                  spline tries to pass through all dataset points exactly
+                * LambdaV>0 means that a smoothing thin  plate  spline  is
+                  built, with larger LambdaV corresponding to models  with
+                  less nonlinearities. Smoothing spline reproduces  target
+                  values at nodes with small error; from the  other  side,
+                  it is much more stable.
+                  Recommended values:
+                  * 1.0E-6 for minimal stability improving smoothing
+                  * 1.0E-3 a good value to start experiments; first results
+                    are visible
+                  * 1.0 for strong smoothing
+
+IMPORTANT: this model construction algorithm was introduced in ALGLIB 3.19
+           and  produces  models  which  are  INCOMPATIBLE  with  previous
+           versions of ALGLIB. You can  not  unserialize  models  produced
+           with this function in ALGLIB 3.18 or earlier.
+
+NOTE:      polyharmonic RBFs, including thin plate splines,  are  somewhat
+           slower than compactly supported RBFs built with  HRBF algorithm
+           due to the fact that non-compact basis function does not vanish
+           far away from the nodes. From the other side, polyharmonic RBFs
+           often produce much better results than HRBFs.
+
+NOTE:      this algorithm supports specification of per-dimensional  radii
+           via scale vector, which is set by means of rbfsetpointsandscales()
+           function. This feature is useful if  you solve  spatio-temporal
+           interpolation problems where different radii are  required  for
+           spatial and temporal dimensions.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+#if !defined(AE_NO_EXCEPTIONS)
+void rbfsetalgothinplatespline(const rbfmodel &s, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;    
+    double lambdav;
+
+    lambdav = 0.0;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbfsetalgothinplatespline(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), lambdav, &_alglib_env_state);
+
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+#endif
+
+/*************************************************************************
+This function chooses a multiquadric DDM-RBF solver,  a  fast  RBF  solver
+with f(r)=sqrt(r^2+Alpha^2) as a basis function,  with  manual  choice  of
+the scale parameter Alpha.
+
+This algorithm has following important features:
+* C2 continuous RBF model (when Alpha>0 is used; for Alpha=0 the model  is
+  merely C0 continuous)
+* fast  model construction algorithm with O(N) memory and  O(N^2)  running
+  time requirements. Hundreds of thousands of points can be  handled  with
+  this algorithm.
+* controllable smoothing via optional nonlinearity penalty
+
+One important point is that  this  algorithm  includes  tunable  parameter
+Alpha, which should be carefully chosen. Selecting too  large  value  will
+result in extremely badly  conditioned  problems  (interpolation  accuracy
+may degrade up to complete breakdown) whilst selecting too small value may
+produce models that are precise but nearly nonsmooth at the nodes.
+
+Good value to  start  from  is  mean  distance  between  nodes. Generally,
+choosing too small Alpha is better than choosing too large - in the former
+case you still have model that reproduces target values at the nodes.
+
+In most cases, better option is to choose good Alpha automatically - it is
+done by another version of the same algorithm that is activated by calling
+rbfsetalgomultiquadricauto() method.
+
+INPUT PARAMETERS:
+    S       -   RBF model, initialized by rbfcreate() call
+    Alpha   -   basis function parameter, Alpha>=0:
+                * Alpha>0  means that multiquadric algorithm is used which
+                  produces C2-continuous RBF model
+                * Alpha=0  means that the multiquadric kernel  effectively
+                  becomes a biharmonic one: f=r. As a  result,  the  model
+                  becomes nonsmooth at nodes, and hence is C0 continuous
+    LambdaV -   smoothing parameter, LambdaV>=0, defaults to 0.0:
+                * LambdaV=0 means that no smoothing is applied,  i.e.  the
+                  spline tries to pass through all dataset points exactly
+                * LambdaV>0 means that a multiquadric spline is built with
+                  larger  LambdaV   corresponding   to  models  with  less
+                  nonlinearities.  Smoothing   spline   reproduces  target
+                  values at nodes with small error; from the  other  side,
+                  it is much more stable.
+                  Recommended values:
+                  * 1.0E-6 for minimal stability improving smoothing
+                  * 1.0E-3 a good value to start experiments; first results
+                    are visible
+                  * 1.0 for strong smoothing
+
+IMPORTANT: this model construction algorithm was introduced in ALGLIB 3.19
+           and  produces  models  which  are  INCOMPATIBLE  with  previous
+           versions of ALGLIB. You can  not  unserialize  models  produced
+           with this function in ALGLIB 3.18 or earlier.
+
+NOTE:      polyharmonic RBFs, including thin plate splines,  are  somewhat
+           slower than compactly supported RBFs built with  HRBF algorithm
+           due to the fact that non-compact basis function does not vanish
+           far away from the nodes. From the other side, polyharmonic RBFs
+           often produce much better results than HRBFs.
+
+NOTE:      this algorithm supports specification of per-dimensional  radii
+           via scale vector, which is set by means of rbfsetpointsandscales()
+           function. This feature is useful if  you solve  spatio-temporal
+           interpolation problems where different radii are  required  for
+           spatial and temporal dimensions.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfsetalgomultiquadricmanual(const rbfmodel &s, const double alpha, const double lambdav, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbfsetalgomultiquadricmanual(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), alpha, lambdav, &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+
+/*************************************************************************
+This function chooses a multiquadric DDM-RBF solver,  a  fast  RBF  solver
+with f(r)=sqrt(r^2+Alpha^2) as a basis function,  with  manual  choice  of
+the scale parameter Alpha.
+
+This algorithm has following important features:
+* C2 continuous RBF model (when Alpha>0 is used; for Alpha=0 the model  is
+  merely C0 continuous)
+* fast  model construction algorithm with O(N) memory and  O(N^2)  running
+  time requirements. Hundreds of thousands of points can be  handled  with
+  this algorithm.
+* controllable smoothing via optional nonlinearity penalty
+
+One important point is that  this  algorithm  includes  tunable  parameter
+Alpha, which should be carefully chosen. Selecting too  large  value  will
+result in extremely badly  conditioned  problems  (interpolation  accuracy
+may degrade up to complete breakdown) whilst selecting too small value may
+produce models that are precise but nearly nonsmooth at the nodes.
+
+Good value to  start  from  is  mean  distance  between  nodes. Generally,
+choosing too small Alpha is better than choosing too large - in the former
+case you still have model that reproduces target values at the nodes.
+
+In most cases, better option is to choose good Alpha automatically - it is
+done by another version of the same algorithm that is activated by calling
+rbfsetalgomultiquadricauto() method.
+
+INPUT PARAMETERS:
+    S       -   RBF model, initialized by rbfcreate() call
+    Alpha   -   basis function parameter, Alpha>=0:
+                * Alpha>0  means that multiquadric algorithm is used which
+                  produces C2-continuous RBF model
+                * Alpha=0  means that the multiquadric kernel  effectively
+                  becomes a biharmonic one: f=r. As a  result,  the  model
+                  becomes nonsmooth at nodes, and hence is C0 continuous
+    LambdaV -   smoothing parameter, LambdaV>=0, defaults to 0.0:
+                * LambdaV=0 means that no smoothing is applied,  i.e.  the
+                  spline tries to pass through all dataset points exactly
+                * LambdaV>0 means that a multiquadric spline is built with
+                  larger  LambdaV   corresponding   to  models  with  less
+                  nonlinearities.  Smoothing   spline   reproduces  target
+                  values at nodes with small error; from the  other  side,
+                  it is much more stable.
+                  Recommended values:
+                  * 1.0E-6 for minimal stability improving smoothing
+                  * 1.0E-3 a good value to start experiments; first results
+                    are visible
+                  * 1.0 for strong smoothing
+
+IMPORTANT: this model construction algorithm was introduced in ALGLIB 3.19
+           and  produces  models  which  are  INCOMPATIBLE  with  previous
+           versions of ALGLIB. You can  not  unserialize  models  produced
+           with this function in ALGLIB 3.18 or earlier.
+
+NOTE:      polyharmonic RBFs, including thin plate splines,  are  somewhat
+           slower than compactly supported RBFs built with  HRBF algorithm
+           due to the fact that non-compact basis function does not vanish
+           far away from the nodes. From the other side, polyharmonic RBFs
+           often produce much better results than HRBFs.
+
+NOTE:      this algorithm supports specification of per-dimensional  radii
+           via scale vector, which is set by means of rbfsetpointsandscales()
+           function. This feature is useful if  you solve  spatio-temporal
+           interpolation problems where different radii are  required  for
+           spatial and temporal dimensions.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+#if !defined(AE_NO_EXCEPTIONS)
+void rbfsetalgomultiquadricmanual(const rbfmodel &s, const double alpha, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;    
+    double lambdav;
+
+    lambdav = 0.0;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbfsetalgomultiquadricmanual(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), alpha, lambdav, &_alglib_env_state);
+
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+#endif
+
+/*************************************************************************
+This function chooses a multiquadric DDM-RBF solver,  a  fast  RBF  solver
+with f(r)=sqrt(r^2+Alpha^2)  as  a  basis  function,  with   Alpha   being
+automatically determined.
+
+This algorithm has following important features:
+* easy setup - no need to tune Alpha, good value is automatically assigned
+* C2 continuous RBF model
+* fast  model construction algorithm with O(N) memory and  O(N^2)  running
+  time requirements. Hundreds of thousands of points can be  handled  with
+  this algorithm.
+* controllable smoothing via optional nonlinearity penalty
+
+This algorithm automatically selects Alpha  as  a  mean  distance  to  the
+nearest neighbor (ignoring neighbors that are too close).
+
+INPUT PARAMETERS:
+    S       -   RBF model, initialized by rbfcreate() call
+    LambdaV -   smoothing parameter, LambdaV>=0, defaults to 0.0:
+                * LambdaV=0 means that no smoothing is applied,  i.e.  the
+                  spline tries to pass through all dataset points exactly
+                * LambdaV>0 means that a multiquadric spline is built with
+                  larger  LambdaV   corresponding   to  models  with  less
+                  nonlinearities.  Smoothing   spline   reproduces  target
+                  values at nodes with small error; from the  other  side,
+                  it is much more stable.
+                  Recommended values:
+                  * 1.0E-6 for minimal stability improving smoothing
+                  * 1.0E-3 a good value to start experiments; first results
+                    are visible
+                  * 1.0 for strong smoothing
+
+IMPORTANT: this model construction algorithm was introduced in ALGLIB 3.19
+           and  produces  models  which  are  INCOMPATIBLE  with  previous
+           versions of ALGLIB. You can  not  unserialize  models  produced
+           with this function in ALGLIB 3.18 or earlier.
+
+NOTE:      polyharmonic RBFs, including thin plate splines,  are  somewhat
+           slower than compactly supported RBFs built with  HRBF algorithm
+           due to the fact that non-compact basis function does not vanish
+           far away from the nodes. From the other side, polyharmonic RBFs
+           often produce much better results than HRBFs.
+
+NOTE:      this algorithm supports specification of per-dimensional  radii
+           via scale vector, which is set by means of rbfsetpointsandscales()
+           function. This feature is useful if  you solve  spatio-temporal
+           interpolation problems where different radii are  required  for
+           spatial and temporal dimensions.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfsetalgomultiquadricauto(const rbfmodel &s, const double lambdav, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbfsetalgomultiquadricauto(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), lambdav, &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+
+/*************************************************************************
+This function chooses a multiquadric DDM-RBF solver,  a  fast  RBF  solver
+with f(r)=sqrt(r^2+Alpha^2)  as  a  basis  function,  with   Alpha   being
+automatically determined.
+
+This algorithm has following important features:
+* easy setup - no need to tune Alpha, good value is automatically assigned
+* C2 continuous RBF model
+* fast  model construction algorithm with O(N) memory and  O(N^2)  running
+  time requirements. Hundreds of thousands of points can be  handled  with
+  this algorithm.
+* controllable smoothing via optional nonlinearity penalty
+
+This algorithm automatically selects Alpha  as  a  mean  distance  to  the
+nearest neighbor (ignoring neighbors that are too close).
+
+INPUT PARAMETERS:
+    S       -   RBF model, initialized by rbfcreate() call
+    LambdaV -   smoothing parameter, LambdaV>=0, defaults to 0.0:
+                * LambdaV=0 means that no smoothing is applied,  i.e.  the
+                  spline tries to pass through all dataset points exactly
+                * LambdaV>0 means that a multiquadric spline is built with
+                  larger  LambdaV   corresponding   to  models  with  less
+                  nonlinearities.  Smoothing   spline   reproduces  target
+                  values at nodes with small error; from the  other  side,
+                  it is much more stable.
+                  Recommended values:
+                  * 1.0E-6 for minimal stability improving smoothing
+                  * 1.0E-3 a good value to start experiments; first results
+                    are visible
+                  * 1.0 for strong smoothing
+
+IMPORTANT: this model construction algorithm was introduced in ALGLIB 3.19
+           and  produces  models  which  are  INCOMPATIBLE  with  previous
+           versions of ALGLIB. You can  not  unserialize  models  produced
+           with this function in ALGLIB 3.18 or earlier.
+
+NOTE:      polyharmonic RBFs, including thin plate splines,  are  somewhat
+           slower than compactly supported RBFs built with  HRBF algorithm
+           due to the fact that non-compact basis function does not vanish
+           far away from the nodes. From the other side, polyharmonic RBFs
+           often produce much better results than HRBFs.
+
+NOTE:      this algorithm supports specification of per-dimensional  radii
+           via scale vector, which is set by means of rbfsetpointsandscales()
+           function. This feature is useful if  you solve  spatio-temporal
+           interpolation problems where different radii are  required  for
+           spatial and temporal dimensions.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+#if !defined(AE_NO_EXCEPTIONS)
+void rbfsetalgomultiquadricauto(const rbfmodel &s, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;    
+    double lambdav;
+
+    lambdav = 0.0;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbfsetalgomultiquadricauto(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), lambdav, &_alglib_env_state);
+
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+#endif
+
+/*************************************************************************
+This  function  chooses  a  biharmonic DDM-RBF solver, a fast  RBF  solver
+with f(r)=r as a basis function.
+
+This algorithm has following important features:
+* no tunable parameters
+* C0 continuous RBF model (the model has discontinuous derivatives at  the
+  interpolation nodes)
+* fast  model construction algorithm with O(N) memory and  O(N^2)  running
+  time requirements. Hundreds of thousands of points can be  handled  with
+  this algorithm.
+* controllable smoothing via optional nonlinearity penalty
+
+INPUT PARAMETERS:
+    S       -   RBF model, initialized by rbfcreate() call
+    LambdaV -   smoothing parameter, LambdaV>=0, defaults to 0.0:
+                * LambdaV=0 means that no smoothing is applied,  i.e.  the
+                  spline tries to pass through all dataset points exactly
+                * LambdaV>0 means that a multiquadric spline is built with
+                  larger  LambdaV   corresponding   to  models  with  less
+                  nonlinearities.  Smoothing   spline   reproduces  target
+                  values at nodes with small error; from the  other  side,
+                  it is much more stable.
+                  Recommended values:
+                  * 1.0E-6 for minimal stability improving smoothing
+                  * 1.0E-3 a good value to start experiments; first results
+                    are visible
+                  * 1.0 for strong smoothing
+
+IMPORTANT: this model construction algorithm was introduced in ALGLIB 3.19
+           and  produces  models  which  are  INCOMPATIBLE  with  previous
+           versions of ALGLIB. You can  not  unserialize  models  produced
+           with this function in ALGLIB 3.18 or earlier.
+
+NOTE:      polyharmonic RBFs, including thin plate splines,  are  somewhat
+           slower than compactly supported RBFs built with  HRBF algorithm
+           due to the fact that non-compact basis function does not vanish
+           far away from the nodes. From the other side, polyharmonic RBFs
+           often produce much better results than HRBFs.
+
+NOTE:      this algorithm supports specification of per-dimensional  radii
+           via scale vector, which is set by means of rbfsetpointsandscales()
+           function. This feature is useful if  you solve  spatio-temporal
+           interpolation problems where different radii are  required  for
+           spatial and temporal dimensions.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfsetalgobiharmonic(const rbfmodel &s, const double lambdav, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbfsetalgobiharmonic(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), lambdav, &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+
+/*************************************************************************
+This  function  chooses  a  biharmonic DDM-RBF solver, a fast  RBF  solver
+with f(r)=r as a basis function.
+
+This algorithm has following important features:
+* no tunable parameters
+* C0 continuous RBF model (the model has discontinuous derivatives at  the
+  interpolation nodes)
+* fast  model construction algorithm with O(N) memory and  O(N^2)  running
+  time requirements. Hundreds of thousands of points can be  handled  with
+  this algorithm.
+* controllable smoothing via optional nonlinearity penalty
+
+INPUT PARAMETERS:
+    S       -   RBF model, initialized by rbfcreate() call
+    LambdaV -   smoothing parameter, LambdaV>=0, defaults to 0.0:
+                * LambdaV=0 means that no smoothing is applied,  i.e.  the
+                  spline tries to pass through all dataset points exactly
+                * LambdaV>0 means that a multiquadric spline is built with
+                  larger  LambdaV   corresponding   to  models  with  less
+                  nonlinearities.  Smoothing   spline   reproduces  target
+                  values at nodes with small error; from the  other  side,
+                  it is much more stable.
+                  Recommended values:
+                  * 1.0E-6 for minimal stability improving smoothing
+                  * 1.0E-3 a good value to start experiments; first results
+                    are visible
+                  * 1.0 for strong smoothing
+
+IMPORTANT: this model construction algorithm was introduced in ALGLIB 3.19
+           and  produces  models  which  are  INCOMPATIBLE  with  previous
+           versions of ALGLIB. You can  not  unserialize  models  produced
+           with this function in ALGLIB 3.18 or earlier.
+
+NOTE:      polyharmonic RBFs, including thin plate splines,  are  somewhat
+           slower than compactly supported RBFs built with  HRBF algorithm
+           due to the fact that non-compact basis function does not vanish
+           far away from the nodes. From the other side, polyharmonic RBFs
+           often produce much better results than HRBFs.
+
+NOTE:      this algorithm supports specification of per-dimensional  radii
+           via scale vector, which is set by means of rbfsetpointsandscales()
+           function. This feature is useful if  you solve  spatio-temporal
+           interpolation problems where different radii are  required  for
+           spatial and temporal dimensions.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+#if !defined(AE_NO_EXCEPTIONS)
+void rbfsetalgobiharmonic(const rbfmodel &s, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;    
+    double lambdav;
+
+    lambdav = 0.0;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbfsetalgobiharmonic(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), lambdav, &_alglib_env_state);
+
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+#endif
+
+/*************************************************************************
 This function sets linear term (model is a sum of radial  basis  functions
 plus linear polynomial). This function won't have effect until  next  call
 to RBFBuildModel().
 
+Using linear term is a default option and it is the best one - it provides
+best convergence guarantees for all RBF model  types: legacy  RBF-QNN  and
+RBF-ML, Gaussian HRBFs and all types of DDM-RBF models.
+
+Other options, like constant or zero term, work for HRBFs,  almost  always
+work for DDM-RBFs but provide no stability  guarantees  in the latter case
+(e.g. the solver may fail on some carefully prepared problems).
+
 INPUT PARAMETERS:
     S       -   RBF model, initialized by RBFCreate() call
-
-NOTE: this   function  has   some   serialization-related  subtleties.  We
-      recommend you to study serialization examples from ALGLIB  Reference
-      Manual if you want to perform serialization of your models.
 
   -- ALGLIB --
      Copyright 13.12.2011 by Bochkanov Sergey
@@ -16117,12 +16429,14 @@ This function sets constant term (model is a sum of radial basis functions
 plus constant).  This  function  won't  have  effect  until  next  call to
 RBFBuildModel().
 
+IMPORTANT: thin plate splines require  polynomial term to be  linear,  not
+           constant,  in  order  to  provide   interpolation   guarantees.
+           Although  failures  are  exceptionally  rare,  some  small  toy
+           problems may result in degenerate linear systems. Thus,  it  is
+           advised to use linear term when one fits data with TPS.
+
 INPUT PARAMETERS:
     S       -   RBF model, initialized by RBFCreate() call
-
-NOTE: this   function  has   some   serialization-related  subtleties.  We
-      recommend you to study serialization examples from ALGLIB  Reference
-      Manual if you want to perform serialization of your models.
 
   -- ALGLIB --
      Copyright 13.12.2011 by Bochkanov Sergey
@@ -16154,12 +16468,20 @@ This  function  sets  zero  term (model is a sum of radial basis functions
 without polynomial term). This function won't have effect until next  call
 to RBFBuildModel().
 
+IMPORTANT: only  Gaussian  RBFs  (HRBF  algorithm)  provide  interpolation
+           guarantees when no polynomial term is used.  Most  other  RBFs,
+           including   biharmonic  splines,   thin   plate   splines   and
+           multiquadrics, require at least constant term  (biharmonic  and
+           multiquadric) or linear one (thin plate splines)  in  order  to
+           guarantee non-degeneracy of linear systems being solved.
+
+           Although  failures  are  exceptionally  rare,  some  small  toy
+           problems still may result in degenerate linear systems. Thus,it
+           is advised to use constant/linear term, unless one is 100% sure
+           that he needs zero term.
+
 INPUT PARAMETERS:
     S       -   RBF model, initialized by RBFCreate() call
-
-NOTE: this   function  has   some   serialization-related  subtleties.  We
-      recommend you to study serialization examples from ALGLIB  Reference
-      Manual if you want to perform serialization of your models.
 
   -- ALGLIB --
      Copyright 13.12.2011 by Bochkanov Sergey
@@ -16328,8 +16650,9 @@ INPUT PARAMETERS:
                   * -4 - nonconvergence of the internal SVD solver
                   * -3   incorrect model construction algorithm was chosen:
                          QNN or RBF-ML, combined with one of the incompatible
-                         features - NX=1 or NX>3; points with per-dimension
-                         scales.
+                         features:
+                         * NX=1 or NX>3
+                         * points with per-dimension scales.
                   *  1 - successful termination
                   *  8 - a termination request was submitted via
                          rbfrequesttermination() function.
@@ -16377,23 +16700,22 @@ void rbfbuildmodel(const rbfmodel &s, rbfreport &rep, const xparams _xparams)
 }
 
 /*************************************************************************
-This function calculates values of the RBF model in the given point.
+This function calculates values of the 1-dimensional RBF model with scalar
+output (NY=1) at the given point.
 
 IMPORTANT: this function works only with modern  (hierarchical)  RBFs.  It
            can not be used with legacy (version 1) RBFs because older  RBF
            code does not support 1-dimensional models.
 
-This function should be used when we have NY=1 (scalar function) and  NX=1
-(1-dimensional space). If you have 3-dimensional space, use rbfcalc3(). If
-you  have  2-dimensional  space,  use  rbfcalc3().  If  you  have  general
-situation (NX-dimensional space, NY-dimensional function)  you  should use
-generic rbfcalc().
-
-If you want to perform parallel model evaluation  from  multiple  threads,
-use rbftscalcbuf() with per-thread buffer object.
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
 
 This function returns 0.0 when:
-* model is not initialized
+* the model is not initialized
 * NX<>1
 * NY<>1
 
@@ -16430,19 +16752,15 @@ double rbfcalc1(const rbfmodel &s, const double x0, const xparams _xparams)
 }
 
 /*************************************************************************
-This function calculates values of the RBF model in the given point.
+This function calculates values of the 2-dimensional RBF model with scalar
+output (NY=1) at the given point.
 
-This function should be used when we have NY=1 (scalar function) and  NX=2
-(2-dimensional space). If you have 3-dimensional space, use rbfcalc3(). If
-you have general situation (NX-dimensional space, NY-dimensional function)
-you should use generic rbfcalc().
-
-If  you  want  to  calculate  function  values  many times, consider using
-rbfgridcalc2v(), which is far more efficient than many subsequent calls to
-rbfcalc2().
-
-If you want to perform parallel model evaluation  from  multiple  threads,
-use rbftscalcbuf() with per-thread buffer object.
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
 
 This function returns 0.0 when:
 * model is not initialized
@@ -16483,19 +16801,15 @@ double rbfcalc2(const rbfmodel &s, const double x0, const double x1, const xpara
 }
 
 /*************************************************************************
-This function calculates value of the RBF model in the given point.
+This function calculates values of the 3-dimensional RBF model with scalar
+output (NY=1) at the given point.
 
-This function should be used when we have NY=1 (scalar function) and  NX=3
-(3-dimensional space). If you have 2-dimensional space, use rbfcalc2(). If
-you have general situation (NX-dimensional space, NY-dimensional function)
-you should use generic rbfcalc().
-
-If  you  want  to  calculate  function  values  many times, consider using
-rbfgridcalc3v(), which is far more efficient than many subsequent calls to
-rbfcalc3().
-
-If you want to perform parallel model evaluation  from  multiple  threads,
-use rbftscalcbuf() with per-thread buffer object.
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
 
 This function returns 0.0 when:
 * model is not initialized
@@ -16537,6 +16851,168 @@ double rbfcalc3(const rbfmodel &s, const double x0, const double x1, const doubl
 }
 
 /*************************************************************************
+This function calculates value and derivatives of  the  1-dimensional  RBF
+model with scalar output (NY=1) at the given point.
+
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
+
+This function returns 0.0 in Y and/or DY in the following cases:
+* the model is not initialized (Y=0, DY=0)
+* NX<>1 or NY<>1 (Y=0, DY=0)
+* the gradient is undefined at the trial point. Some basis  functions have
+  discontinuous derivatives at the interpolation nodes:
+  * biharmonic splines f=r have no Hessian and no gradient at the nodes
+  In these cases only DY is set to zero (Y is still returned)
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X0      -   first coordinate, finite number
+
+OUTPUT PARAMETERS:
+    Y       -   value of the model or 0.0 (as defined above)
+    DY0     -   derivative with respect to X0
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfdiff1(const rbfmodel &s, const double x0, double &y, double &dy0, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbfdiff1(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), x0, &y, &dy0, &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+
+/*************************************************************************
+This function calculates value and derivatives of  the  2-dimensional  RBF
+model with scalar output (NY=1) at the given point.
+
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
+
+This function returns 0.0 in Y and/or DY in the following cases:
+* the model is not initialized (Y=0, DY=0)
+* NX<>2 or NY<>1 (Y=0, DY=0)
+* the gradient is undefined at the trial point. Some basis  functions have
+  discontinuous derivatives at the interpolation nodes:
+  * biharmonic splines f=r have no Hessian and no gradient at the nodes
+  In these cases only DY is set to zero (Y is still returned)
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X0      -   first coordinate, finite number
+    X1      -   second coordinate, finite number
+
+OUTPUT PARAMETERS:
+    Y       -   value of the model or 0.0 (as defined above)
+    DY0     -   derivative with respect to X0
+    DY1     -   derivative with respect to X1
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfdiff2(const rbfmodel &s, const double x0, const double x1, double &y, double &dy0, double &dy1, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbfdiff2(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), x0, x1, &y, &dy0, &dy1, &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+
+/*************************************************************************
+This function calculates value and derivatives of  the  3-dimensional  RBF
+model with scalar output (NY=1) at the given point.
+
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
+
+This function returns 0.0 in Y and/or DY in the following cases:
+* the model is not initialized (Y=0, DY=0)
+* NX<>3 or NY<>1 (Y=0, DY=0)
+* the gradient is undefined at the trial point. Some basis  functions have
+  discontinuous derivatives at the interpolation nodes:
+  * biharmonic splines f=r have no Hessian and no gradient at the nodes
+  In these cases only DY is set to zero (Y is still returned)
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X0      -   first coordinate, finite number
+    X1      -   second coordinate, finite number
+    X2      -   third coordinate, finite number
+
+OUTPUT PARAMETERS:
+    Y       -   value of the model or 0.0 (as defined above)
+    DY0     -   derivative with respect to X0
+    DY1     -   derivative with respect to X1
+    DY2     -   derivative with respect to X2
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfdiff3(const rbfmodel &s, const double x0, const double x1, const double x2, double &y, double &dy0, double &dy1, double &dy2, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbfdiff3(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), x0, x1, x2, &y, &dy0, &dy1, &dy2, &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+
+/*************************************************************************
 This function calculates values of the RBF model at the given point.
 
 This is general function which can be used for arbitrary NX (dimension  of
@@ -16544,8 +17020,12 @@ the space of arguments) and NY (dimension of the function itself). However
 when  you  have  NY=1  you  may  find more convenient to use rbfcalc2() or
 rbfcalc3().
 
-If you want to perform parallel model evaluation  from  multiple  threads,
-use rbftscalcbuf() with per-thread buffer object.
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
 
 This function returns 0.0 when model is not initialized.
 
@@ -16587,13 +17067,168 @@ void rbfcalc(const rbfmodel &s, const real_1d_array &x, real_1d_array &y, const 
 }
 
 /*************************************************************************
+This function calculates values of the RBF model and  its  derivatives  at
+the given point.
+
+This is general function which can be used for arbitrary NX (dimension  of
+the space of arguments) and NY (dimension of the function itself). However
+if you have NX=3 and NY=1, you may find more convenient to use rbfdiff3().
+
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftsdiffbuf() with per-thread buffer object.
+
+This function returns 0.0 in Y and/or DY in the following cases:
+* the model is not initialized (Y=0, DY=0)
+* the gradient is undefined at the trial point. Some basis  functions have
+  discontinuous derivatives at the interpolation nodes:
+  * biharmonic splines f=r have no Hessian and no gradient at the nodes
+  In these cases only DY is set to zero (Y is still returned)
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only
+                leading NX will be used.
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY]. Y is out-parameter and
+                reallocated after call to this function. In case you  want
+                to reuse previously allocated Y, you may use RBFDiffBuf(),
+                which reallocates Y only when it is too small.
+    DY      -   derivatives, array[NX*NY]:
+                * Y[I*NX+J] with 0<=I<NY and 0<=J<NX  stores derivative of
+                  function component I with respect to input J.
+                * for NY=1 it is simply NX-dimensional gradient of the
+                  scalar NX-dimensional function
+                DY is out-parameter and reallocated  after  call  to  this
+                function. In case you want to reuse  previously  allocated
+                DY, you may use RBFDiffBuf(), which  reallocates  DY  only
+                when it is too small to store the result.
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfdiff(const rbfmodel &s, const real_1d_array &x, real_1d_array &y, real_1d_array &dy, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbfdiff(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), const_cast<alglib_impl::ae_vector*>(x.c_ptr()), const_cast<alglib_impl::ae_vector*>(y.c_ptr()), const_cast<alglib_impl::ae_vector*>(dy.c_ptr()), &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+
+/*************************************************************************
+This function calculates values of the RBF model and  its first and second
+derivatives (Hessian matrix) at the given point.
+
+This function supports both scalar (NY=1) and vector-valued (NY>1) RBFs.
+
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftshessbuf() with per-thread buffer object.
+
+This function returns 0 in Y and/or DY and/or D2Y in the following cases:
+* the model is not initialized (Y=0, DY=0, D2Y=0)
+* the gradient and/or Hessian is undefined at the trial point.  Some basis
+  functions have discontinuous derivatives at the interpolation nodes:
+  * thin plate splines have no Hessian at the nodes
+  * biharmonic splines f=r have no Hessian and no gradient at the  nodes
+  In these cases only corresponding derivative is set  to  zero,  and  the
+  rest of the derivatives is still returned.
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only
+                leading NX will be used.
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY].
+                Y is out-parameter and  reallocated  after  call  to  this
+                function. In case you  want to reuse previously  allocated
+                Y, you may use RBFHessBuf(), which reallocates Y only when
+                it is too small.
+    DY      -   first derivatives, array[NY*NX]:
+                * Y[I*NX+J] with 0<=I<NY and 0<=J<NX  stores derivative of
+                  function component I with respect to input J.
+                * for NY=1 it is simply NX-dimensional gradient of the
+                  scalar NX-dimensional function
+                DY is out-parameter and reallocated  after  call  to  this
+                function. In case you want to reuse  previously  allocated
+                DY, you may use RBFHessBuf(), which  reallocates  DY  only
+                when it is too small to store the result.
+    D2Y     -   second derivatives, array[NY*NX*NX]:
+                * for NY=1 it is NX*NX array that stores  Hessian  matrix,
+                  with Y[I*NX+J]=Y[J*NX+I].
+                * for  a  vector-valued  RBF  with  NY>1  it  contains  NY
+                  subsequently stored Hessians: an element Y[K*NX*NX+I*NX+J]
+                  with  0<=K<NY,  0<=I<NX  and  0<=J<NX    stores   second
+                  derivative of the function #K  with  respect  to  inputs
+                  #I and #J.
+                D2Y is out-parameter and reallocated  after  call  to this
+                function. In case you want to reuse  previously  allocated
+                D2Y, you may use RBFHessBuf(), which  reallocates D2Y only
+                when it is too small to store the result.
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfhess(const rbfmodel &s, const real_1d_array &x, real_1d_array &y, real_1d_array &dy, real_1d_array &d2y, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbfhess(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), const_cast<alglib_impl::ae_vector*>(x.c_ptr()), const_cast<alglib_impl::ae_vector*>(y.c_ptr()), const_cast<alglib_impl::ae_vector*>(dy.c_ptr()), const_cast<alglib_impl::ae_vector*>(d2y.c_ptr()), &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+
+/*************************************************************************
 This function calculates values of the RBF model at the given point.
 
 Same as rbfcalc(), but does not reallocate Y when in is large enough to
 store function values.
 
-If you want to perform parallel model evaluation  from  multiple  threads,
-use rbftscalcbuf() with per-thread buffer object.
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
 
 INPUT PARAMETERS:
     S       -   RBF model
@@ -16627,6 +17262,149 @@ void rbfcalcbuf(const rbfmodel &s, const real_1d_array &x, real_1d_array &y, con
     if( _xparams.flags!=0x0 )
         ae_state_set_flags(&_alglib_env_state, _xparams.flags);
     alglib_impl::rbfcalcbuf(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), const_cast<alglib_impl::ae_vector*>(x.c_ptr()), const_cast<alglib_impl::ae_vector*>(y.c_ptr()), &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+
+/*************************************************************************
+This function calculates values of the RBF model and  its  derivatives  at
+the given point. It is a buffered version of the RBFDiff() which tries  to
+reuse possibly preallocated output arrays Y/DY as much as possible.
+
+This is general function which can be used for arbitrary NX (dimension  of
+the space of arguments) and NY (dimension of the function itself). However
+if you have NX=1, 2 or 3 and NY=1, you may find  more  convenient  to  use
+rbfdiff1(), rbfdiff2() or rbfdiff3().
+
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftsdiffbuf() with per-thread buffer object.
+
+This function returns 0.0 in Y and/or DY in the following cases:
+* the model is not initialized (Y=0, DY=0)
+* the gradient is undefined at the trial point. Some basis  functions have
+  discontinuous derivatives at the interpolation nodes:
+  * biharmonic splines f=r have no Hessian and no gradient at the nodes
+  In these cases only DY is set to zero (Y is still returned)
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only
+                leading NX will be used.
+    Y, DY   -   possibly preallocated arrays; if array size is large enough
+                to store results, this function does not  reallocate  array
+                to fit output size exactly.
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY].
+    DY      -   derivatives, array[NX*NY]:
+                * Y[I*NX+J] with 0<=I<NY and 0<=J<NX  stores derivative of
+                  function component I with respect to input J.
+                * for NY=1 it is simply NX-dimensional gradient of the
+                  scalar NX-dimensional function
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfdiffbuf(const rbfmodel &s, const real_1d_array &x, real_1d_array &y, real_1d_array &dy, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbfdiffbuf(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), const_cast<alglib_impl::ae_vector*>(x.c_ptr()), const_cast<alglib_impl::ae_vector*>(y.c_ptr()), const_cast<alglib_impl::ae_vector*>(dy.c_ptr()), &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+
+/*************************************************************************
+This function calculates values of the RBF model and  its first and second
+derivatives (Hessian matrix) at the given point. It is a buffered  version
+that reuses memory  allocated  in  output  buffers  Y/DY/D2Y  as  much  as
+possible.
+
+This function supports both scalar (NY=1) and vector-valued (NY>1) RBFs.
+
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftshessbuf() with per-thread buffer object.
+
+This function returns 0 in Y and/or DY and/or D2Y in the following cases:
+* the model is not initialized (Y=0, DY=0, D2Y=0)
+* the gradient and/or Hessian is undefined at the trial point.  Some basis
+  functions have discontinuous derivatives at the interpolation nodes:
+  * thin plate splines have no Hessian at the nodes
+  * biharmonic splines f=r have no Hessian and no gradient at the  nodes
+  In these cases only corresponding derivative is set  to  zero,  and  the
+  rest of the derivatives is still returned.
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only
+                leading NX will be used.
+    Y,DY,D2Y-   possible preallocated output arrays. If these  arrays  are
+                smaller than  required  to  store  the  result,  they  are
+                automatically reallocated. If array is large enough, it is
+                not resized.
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY].
+    DY      -   first derivatives, array[NY*NX]:
+                * Y[I*NX+J] with 0<=I<NY and 0<=J<NX  stores derivative of
+                  function component I with respect to input J.
+                * for NY=1 it is simply NX-dimensional gradient of the
+                  scalar NX-dimensional function
+    D2Y     -   second derivatives, array[NY*NX*NX]:
+                * for NY=1 it is NX*NX array that stores  Hessian  matrix,
+                  with Y[I*NX+J]=Y[J*NX+I].
+                * for  a  vector-valued  RBF  with  NY>1  it  contains  NY
+                  subsequently stored Hessians: an element Y[K*NX*NX+I*NX+J]
+                  with  0<=K<NY,  0<=I<NX  and  0<=J<NX    stores   second
+                  derivative of the function #K  with  respect  to  inputs
+                  #I and #J.
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfhessbuf(const rbfmodel &s, const real_1d_array &x, real_1d_array &y, real_1d_array &dy, real_1d_array &d2y, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbfhessbuf(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), const_cast<alglib_impl::ae_vector*>(x.c_ptr()), const_cast<alglib_impl::ae_vector*>(y.c_ptr()), const_cast<alglib_impl::ae_vector*>(dy.c_ptr()), const_cast<alglib_impl::ae_vector*>(d2y.c_ptr()), &_alglib_env_state);
     alglib_impl::ae_state_clear(&_alglib_env_state);
     return;
 }
@@ -16674,6 +17452,140 @@ void rbftscalcbuf(const rbfmodel &s, const rbfcalcbuffer &buf, const real_1d_arr
     if( _xparams.flags!=0x0 )
         ae_state_set_flags(&_alglib_env_state, _xparams.flags);
     alglib_impl::rbftscalcbuf(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), const_cast<alglib_impl::rbfcalcbuffer*>(buf.c_ptr()), const_cast<alglib_impl::ae_vector*>(x.c_ptr()), const_cast<alglib_impl::ae_vector*>(y.c_ptr()), &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+
+/*************************************************************************
+This function calculates values of the RBF model and  its  derivatives  at
+the given point, using external buffer object (internal temporaries of the
+RBF model are not modified).
+
+This function allows to use same RBF model object  in  different  threads,
+assuming  that  different   threads  use different instances of the buffer
+structure.
+
+This function returns 0.0 in Y and/or DY in the following cases:
+* the model is not initialized (Y=0, DY=0)
+* the gradient is undefined at the trial point. Some basis  functions have
+  discontinuous derivatives at the interpolation nodes:
+  * biharmonic splines f=r have no Hessian and no gradient at the nodes
+  In these cases only DY is set to zero (Y is still returned)
+
+INPUT PARAMETERS:
+    S       -   RBF model, may be shared between different threads
+    Buf     -   buffer object created for this particular instance of  RBF
+                model with rbfcreatecalcbuffer().
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only
+                leading NX will be used.
+    Y, DY   -   possibly preallocated arrays; if array size is large enough
+                to store results, this function does not  reallocate  array
+                to fit output size exactly.
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY].
+    DY      -   derivatives, array[NX*NY]:
+                * Y[I*NX+J] with 0<=I<NY and 0<=J<NX  stores derivative of
+                  function component I with respect to input J.
+                * for NY=1 it is simply NX-dimensional gradient of the
+                  scalar NX-dimensional function
+                Zero is returned when the first derivative is undefined.
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbftsdiffbuf(const rbfmodel &s, const rbfcalcbuffer &buf, const real_1d_array &x, real_1d_array &y, real_1d_array &dy, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbftsdiffbuf(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), const_cast<alglib_impl::rbfcalcbuffer*>(buf.c_ptr()), const_cast<alglib_impl::ae_vector*>(x.c_ptr()), const_cast<alglib_impl::ae_vector*>(y.c_ptr()), const_cast<alglib_impl::ae_vector*>(dy.c_ptr()), &_alglib_env_state);
+    alglib_impl::ae_state_clear(&_alglib_env_state);
+    return;
+}
+
+/*************************************************************************
+This function calculates values of the RBF model and  its first and second
+derivatives (Hessian matrix) at the given  point,  using  external  buffer
+object (internal temporaries of the RBF  model  are  not  modified).
+
+This function allows to use same RBF model object  in  different  threads,
+assuming  that  different   threads  use different instances of the buffer
+structure.
+
+This function returns 0 in Y and/or DY and/or D2Y in the following cases:
+* the model is not initialized (Y=0, DY=0, D2Y=0)
+* the gradient and/or Hessian is undefined at the trial point.  Some basis
+  functions have discontinuous derivatives at the interpolation nodes:
+  * thin plate splines have no Hessian at the nodes
+  * biharmonic splines f=r have no Hessian and no gradient at the  nodes
+  In these cases only corresponding derivative is set  to  zero,  and  the
+  rest of the derivatives is still returned.
+
+INPUT PARAMETERS:
+    S       -   RBF model, may be shared between different threads
+    Buf     -   buffer object created for this particular instance of  RBF
+                model with rbfcreatecalcbuffer().
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only
+                leading NX will be used.
+    Y,DY,D2Y-   possible preallocated output arrays. If these  arrays  are
+                smaller than  required  to  store  the  result,  they  are
+                automatically reallocated. If array is large enough, it is
+                not resized.
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY].
+    DY      -   first derivatives, array[NY*NX]:
+                * Y[I*NX+J] with 0<=I<NY and 0<=J<NX  stores derivative of
+                  function component I with respect to input J.
+                * for NY=1 it is simply NX-dimensional gradient of the
+                  scalar NX-dimensional function
+                Zero is returned when the first derivative is undefined.
+    D2Y     -   second derivatives, array[NY*NX*NX]:
+                * for NY=1 it is NX*NX array that stores  Hessian  matrix,
+                  with Y[I*NX+J]=Y[J*NX+I].
+                * for  a  vector-valued  RBF  with  NY>1  it  contains  NY
+                  subsequently stored Hessians: an element Y[K*NX*NX+I*NX+J]
+                  with  0<=K<NY,  0<=I<NX  and  0<=J<NX    stores   second
+                  derivative of the function #K  with  respect  to  inputs
+                  #I and #J.
+                Zero is returned when the second derivative is undefined.
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbftshessbuf(const rbfmodel &s, const rbfcalcbuffer &buf, const real_1d_array &x, real_1d_array &y, real_1d_array &dy, real_1d_array &d2y, const xparams _xparams)
+{
+    jmp_buf _break_jump;
+    alglib_impl::ae_state _alglib_env_state;
+    alglib_impl::ae_state_init(&_alglib_env_state);
+    if( setjmp(_break_jump) )
+    {
+#if !defined(AE_NO_EXCEPTIONS)
+        _ALGLIB_CPP_EXCEPTION(_alglib_env_state.error_msg);
+#else
+        _ALGLIB_SET_ERROR_FLAG(_alglib_env_state.error_msg);
+        return;
+#endif
+    }
+    ae_state_set_break_jump(&_alglib_env_state, &_break_jump);
+    if( _xparams.flags!=0x0 )
+        ae_state_set_flags(&_alglib_env_state, _xparams.flags);
+    alglib_impl::rbftshessbuf(const_cast<alglib_impl::rbfmodel*>(s.c_ptr()), const_cast<alglib_impl::rbfcalcbuffer*>(buf.c_ptr()), const_cast<alglib_impl::ae_vector*>(x.c_ptr()), const_cast<alglib_impl::ae_vector*>(y.c_ptr()), const_cast<alglib_impl::ae_vector*>(dy.c_ptr()), const_cast<alglib_impl::ae_vector*>(d2y.c_ptr()), &_alglib_env_state);
     alglib_impl::ae_state_clear(&_alglib_env_state);
     return;
 }
@@ -17096,16 +18008,42 @@ INPUT PARAMETERS:
 OUTPUT PARAMETERS:
     NX      -   dimensionality of argument
     NY      -   dimensionality of the target function
-    XWR     -   model information, array[NC,NX+NY+1].
-                One row of the array corresponds to one basis function:
+    XWR     -   model  information ,  2D  array.  One  row  of  the  array
+                corresponds to one basis function.
+
+                For ModelVersion=1 we have NX+NY+1 columns:
                 * first NX columns  - coordinates of the center
-                * next NY columns   - weights, one per dimension of the
-                                      function being modelled
-                For ModelVersion=1:
+                * next  NY columns  - weights, one per dimension of the
+                                      function being modeled
                 * last column       - radius, same for all dimensions of
-                                      the function being modelled
-                For ModelVersion=2:
+                                      the function being modeled
+
+                For ModelVersion=2 we have NX+NY+NX columns:
+                * first NX columns  - coordinates of the center
+                * next  NY columns  - weights, one per dimension of the
+                                      function being modeled
                 * last NX columns   - radii, one per dimension
+
+                For ModelVersion=3 we have NX+NY+NX+3 columns:
+                * first NX columns  - coordinates of the center
+                * next  NY columns  - weights, one per dimension of the
+                                      function being modeled
+                * next NX columns   - radii, one per dimension
+                * next column       - basis function type:
+                                      * 1  for f=r
+                                      * 2  for f=r^2*ln(r)
+                                      * 10 for multiquadric f=sqrt(r^2+alpha^2)
+                * next column       - basis function parameter:
+                                      * alpha, for basis function type 10
+                                      * ignored (zero) for other basis function types
+                * next column       - point index in the original dataset,
+                                      or -1 for an artificial node created
+                                      by the solver. The algorithm may reorder
+                                      the nodes, drop some nodes or add
+                                      artificial nodes. Thus, one parsing
+                                      this column should expect all these
+                                      kinds of alterations in the dataset.
+
     NC      -   number of the centers
     V       -   polynomial  term , array[NY,NX+1]. One row per one
                 dimension of the function being modelled. First NX
@@ -17116,6 +18054,8 @@ OUTPUT PARAMETERS:
                   compatible with ALGLIB 3.10 or earlier.
                 * 2 - for models created by HierarchicalRBF, requires
                   ALGLIB 3.11 or later
+                * 3 - for models created by DDM-RBF, requires
+                  ALGLIB 3.19 or later
 
   -- ALGLIB --
      Copyright 13.12.2011 by Bochkanov Sergey
@@ -17553,6 +18493,383 @@ static void rbfv1_buildrbfmlayersmodellsqr(/* Real    */ ae_matrix* x,
 
 
 #endif
+#if defined(AE_COMPILE_RBFV3) || !defined(AE_PARTIAL_BUILD)
+static double rbfv3_epsred = 0.999999;
+static ae_int_t rbfv3_maxddmits = 50;
+static double rbfv3_polyharmonic2scale = 4.0;
+static ae_int_t rbfv3_acbfparallelthreshold = 512;
+static ae_int_t rbfv3_ddmparallelthreshold = 512;
+static ae_int_t rbfv3_bfparallelthreshold = 512;
+static void rbfv3_createfastevaluator(rbfv3model* model, ae_state *_state);
+static void rbfv3_gridcalcrec(rbfv3model* s,
+     ae_int_t simdwidth,
+     ae_int_t tileidx0,
+     ae_int_t tileidx1,
+     /* Real    */ ae_vector* x0,
+     ae_int_t n0,
+     /* Real    */ ae_vector* x1,
+     ae_int_t n1,
+     /* Real    */ ae_vector* x2,
+     ae_int_t n2,
+     /* Real    */ ae_vector* x3,
+     ae_int_t n3,
+     /* Boolean */ ae_vector* flagy,
+     ae_bool sparsey,
+     /* Real    */ ae_vector* y,
+     ae_shared_pool* calcpool,
+     ae_bool isrootcall,
+     ae_state *_state);
+void _spawn_rbfv3_gridcalcrec(rbfv3model* s,
+    ae_int_t simdwidth,
+    ae_int_t tileidx0,
+    ae_int_t tileidx1,
+    /* Real    */ ae_vector* x0,
+    ae_int_t n0,
+    /* Real    */ ae_vector* x1,
+    ae_int_t n1,
+    /* Real    */ ae_vector* x2,
+    ae_int_t n2,
+    /* Real    */ ae_vector* x3,
+    ae_int_t n3,
+    /* Boolean */ ae_vector* flagy,
+    ae_bool sparsey,
+    /* Real    */ ae_vector* y,
+    ae_shared_pool* calcpool,
+    ae_bool isrootcall, ae_task_group *_group, ae_bool smp_enabled, ae_state *_state);
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+void _task_rbfv3_gridcalcrec(ae_task_data *_data, ae_state *_state);
+#endif
+ae_bool _trypexec_rbfv3_gridcalcrec(rbfv3model* s,
+    ae_int_t simdwidth,
+    ae_int_t tileidx0,
+    ae_int_t tileidx1,
+    /* Real    */ ae_vector* x0,
+    ae_int_t n0,
+    /* Real    */ ae_vector* x1,
+    ae_int_t n1,
+    /* Real    */ ae_vector* x2,
+    ae_int_t n2,
+    /* Real    */ ae_vector* x3,
+    ae_int_t n3,
+    /* Boolean */ ae_vector* flagy,
+    ae_bool sparsey,
+    /* Real    */ ae_vector* y,
+    ae_shared_pool* calcpool,
+    ae_bool isrootcall, ae_state *_state);
+static void rbfv3_zerofill(rbfv3model* s,
+     ae_int_t nx,
+     ae_int_t ny,
+     ae_state *_state);
+static void rbfv3_allocatecalcbuffer(rbfv3model* s,
+     rbfv3calcbuffer* buf,
+     ae_state *_state);
+static void rbfv3_preprocessdatasetrec(/* Real    */ ae_matrix* xbuf,
+     /* Real    */ ae_matrix* ybuf,
+     /* Integer */ ae_vector* initidx,
+     ae_int_t wrk0,
+     ae_int_t wrk1,
+     ae_int_t nx,
+     ae_int_t ny,
+     double mergetol,
+     /* Real    */ ae_vector* tmpboxmin,
+     /* Real    */ ae_vector* tmpboxmax,
+     /* Real    */ ae_matrix* xout,
+     /* Real    */ ae_matrix* yout,
+     /* Integer */ ae_vector* raw2wrkmap,
+     /* Integer */ ae_vector* wrk2rawmap,
+     ae_int_t* nout,
+     ae_state *_state);
+static void rbfv3_preprocessdataset(/* Real    */ ae_matrix* xraw,
+     double mergetol,
+     /* Real    */ ae_matrix* yraw,
+     /* Real    */ ae_vector* xscaleraw,
+     ae_int_t nraw,
+     ae_int_t nx,
+     ae_int_t ny,
+     ae_int_t bftype,
+     double bfparamraw,
+     double lambdavraw,
+     /* Real    */ ae_matrix* xwrk,
+     /* Real    */ ae_matrix* ywrk,
+     /* Integer */ ae_vector* raw2wrkmap,
+     /* Integer */ ae_vector* wrk2rawmap,
+     ae_int_t* nwrk,
+     /* Real    */ ae_vector* xscalewrk,
+     /* Real    */ ae_vector* xshift,
+     double* bfparamwrk,
+     double* lambdavwrk,
+     double* addxrescaleaplied,
+     ae_state *_state);
+static void rbfv3_selectglobalnodes(/* Real    */ ae_matrix* xx,
+     ae_int_t n,
+     ae_int_t nx,
+     /* Integer */ ae_vector* existingnodes,
+     ae_int_t nexisting,
+     ae_int_t nspec,
+     /* Integer */ ae_vector* nodes,
+     ae_int_t* nchosen,
+     double* maxdist,
+     ae_state *_state);
+static void rbfv3_buildsimplifiedkdtree(/* Real    */ ae_matrix* xx,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_int_t reducefactor,
+     ae_int_t minsize,
+     kdtree* kdt,
+     ae_state *_state);
+static void rbfv3_computetargetscatterdesignmatrices(/* Real    */ ae_matrix* xx,
+     ae_int_t ntotal,
+     ae_int_t nx,
+     ae_int_t functype,
+     double funcparam,
+     /* Integer */ ae_vector* workingnodes,
+     ae_int_t nwrk,
+     /* Integer */ ae_vector* scatternodes,
+     ae_int_t nscatter,
+     /* Real    */ ae_matrix* atwrk,
+     /* Real    */ ae_matrix* atsctr,
+     ae_state *_state);
+static void rbfv3_computeacbfpreconditionerbasecase(acbfbuilder* builder,
+     acbfbuffer* buf,
+     ae_int_t wrk0,
+     ae_int_t wrk1,
+     ae_state *_state);
+static void rbfv3_computeacbfpreconditionerrecv2(acbfbuilder* builder,
+     ae_int_t wrk0,
+     ae_int_t wrk1,
+     ae_state *_state);
+void _spawn_rbfv3_computeacbfpreconditionerrecv2(acbfbuilder* builder,
+    ae_int_t wrk0,
+    ae_int_t wrk1, ae_task_group *_group, ae_bool smp_enabled, ae_state *_state);
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+void _task_rbfv3_computeacbfpreconditionerrecv2(ae_task_data *_data, ae_state *_state);
+#endif
+ae_bool _trypexec_rbfv3_computeacbfpreconditionerrecv2(acbfbuilder* builder,
+    ae_int_t wrk0,
+    ae_int_t wrk1, ae_state *_state);
+static void rbfv3_computeacbfpreconditioner(/* Real    */ ae_matrix* xx,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_int_t functype,
+     double funcparam,
+     ae_int_t aterm,
+     ae_int_t batchsize,
+     ae_int_t nglobal,
+     ae_int_t nlocal,
+     ae_int_t ncorrection,
+     ae_int_t correctorgrowth,
+     ae_int_t simplificationfactor,
+     double lambdav,
+     sparsematrix* sp,
+     ae_state *_state);
+static void rbfv3_ddmsolverinitbasecase(rbf3ddmsolver* solver,
+     /* Real    */ ae_matrix* x,
+     ae_int_t n,
+     ae_int_t nx,
+     rbf3evaluator* bfmatrix,
+     double lambdav,
+     sparsematrix* sp,
+     rbf3ddmbuffer* buf,
+     /* Integer */ ae_vector* tgtidx,
+     ae_int_t tgt0,
+     ae_int_t tgt1,
+     ae_int_t nneighbors,
+     ae_bool dodetailedtrace,
+     ae_state *_state);
+static void rbfv3_ddmsolverinitrec(rbf3ddmsolver* solver,
+     /* Real    */ ae_matrix* x,
+     ae_int_t n,
+     ae_int_t nx,
+     rbf3evaluator* bfmatrix,
+     double lambdav,
+     sparsematrix* sp,
+     /* Integer */ ae_vector* wrkidx,
+     ae_int_t wrk0,
+     ae_int_t wrk1,
+     ae_int_t nneighbors,
+     ae_int_t nbatch,
+     ae_bool dodetailedtrace,
+     ae_state *_state);
+void _spawn_rbfv3_ddmsolverinitrec(rbf3ddmsolver* solver,
+    /* Real    */ ae_matrix* x,
+    ae_int_t n,
+    ae_int_t nx,
+    rbf3evaluator* bfmatrix,
+    double lambdav,
+    sparsematrix* sp,
+    /* Integer */ ae_vector* wrkidx,
+    ae_int_t wrk0,
+    ae_int_t wrk1,
+    ae_int_t nneighbors,
+    ae_int_t nbatch,
+    ae_bool dodetailedtrace, ae_task_group *_group, ae_bool smp_enabled, ae_state *_state);
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+void _task_rbfv3_ddmsolverinitrec(ae_task_data *_data, ae_state *_state);
+#endif
+ae_bool _trypexec_rbfv3_ddmsolverinitrec(rbf3ddmsolver* solver,
+    /* Real    */ ae_matrix* x,
+    ae_int_t n,
+    ae_int_t nx,
+    rbf3evaluator* bfmatrix,
+    double lambdav,
+    sparsematrix* sp,
+    /* Integer */ ae_vector* wrkidx,
+    ae_int_t wrk0,
+    ae_int_t wrk1,
+    ae_int_t nneighbors,
+    ae_int_t nbatch,
+    ae_bool dodetailedtrace, ae_state *_state);
+static void rbfv3_ddmsolverinit(/* Real    */ ae_matrix* x,
+     double rescaledby,
+     ae_int_t n,
+     ae_int_t nx,
+     rbf3evaluator* bfmatrix,
+     ae_int_t bftype,
+     double bfparam,
+     double lambdav,
+     ae_int_t aterm,
+     sparsematrix* sp,
+     ae_int_t nneighbors,
+     ae_int_t nbatch,
+     ae_int_t ncorrector,
+     ae_bool dotrace,
+     ae_bool dodetailedtrace,
+     rbf3ddmsolver* solver,
+     ae_int_t* timeddminit,
+     ae_int_t* timecorrinit,
+     ae_state *_state);
+static void rbfv3_ddmsolverrunrec(rbf3ddmsolver* solver,
+     /* Real    */ ae_matrix* res,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_int_t ny,
+     /* Real    */ ae_matrix* c,
+     ae_int_t cnt,
+     ae_state *_state);
+static void rbfv3_ddmsolverrun(rbf3ddmsolver* solver,
+     /* Real    */ ae_matrix* res,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_int_t ny,
+     sparsematrix* sp,
+     rbf3evaluator* bfmatrix,
+     /* Real    */ ae_matrix* upd,
+     ae_int_t* timeddmsolve,
+     ae_int_t* timecorrsolve,
+     ae_state *_state);
+static void rbfv3_ddmsolverrun1(rbf3ddmsolver* solver,
+     /* Real    */ ae_vector* res,
+     ae_int_t n,
+     ae_int_t nx,
+     sparsematrix* sp,
+     rbf3evaluator* bfmatrix,
+     /* Real    */ ae_vector* upd,
+     ae_int_t* timeddmsolve,
+     ae_int_t* timecorrsolve,
+     ae_state *_state);
+static double rbfv3_autodetectscaleparameter(/* Real    */ ae_matrix* xx,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_state *_state);
+static void rbfv3_computebfmatrixrec(/* Real    */ ae_matrix* xx,
+     ae_int_t range0,
+     ae_int_t range1,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_int_t functype,
+     double funcparam,
+     /* Real    */ ae_matrix* f,
+     ae_state *_state);
+void _spawn_rbfv3_computebfmatrixrec(/* Real    */ ae_matrix* xx,
+    ae_int_t range0,
+    ae_int_t range1,
+    ae_int_t n,
+    ae_int_t nx,
+    ae_int_t functype,
+    double funcparam,
+    /* Real    */ ae_matrix* f, ae_task_group *_group, ae_bool smp_enabled, ae_state *_state);
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+void _task_rbfv3_computebfmatrixrec(ae_task_data *_data, ae_state *_state);
+#endif
+ae_bool _trypexec_rbfv3_computebfmatrixrec(/* Real    */ ae_matrix* xx,
+    ae_int_t range0,
+    ae_int_t range1,
+    ae_int_t n,
+    ae_int_t nx,
+    ae_int_t functype,
+    double funcparam,
+    /* Real    */ ae_matrix* f, ae_state *_state);
+static void rbfv3_computebfmatrix(/* Real    */ ae_matrix* xx,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_int_t functype,
+     double funcparam,
+     /* Real    */ ae_matrix* f,
+     ae_state *_state);
+static void rbfv3_modelmatrixinit(/* Real    */ ae_matrix* xx,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_int_t functype,
+     double funcparam,
+     ae_int_t storagetype,
+     rbf3evaluator* modelmatrix,
+     ae_state *_state);
+static void rbfv3_modelmatrixcomputepartial(rbf3evaluator* modelmatrix,
+     /* Integer */ ae_vector* ridx,
+     ae_int_t m0,
+     /* Integer */ ae_vector* cidx,
+     ae_int_t m1,
+     /* Real    */ ae_matrix* r,
+     ae_state *_state);
+static void rbfv3_computerowchunk(rbf3evaluator* evaluator,
+     /* Real    */ ae_vector* x,
+     rbf3evaluatorbuffer* buf,
+     ae_int_t chunksize,
+     ae_int_t chunkidx,
+     double distance0,
+     ae_int_t needgradinfo,
+     ae_state *_state);
+static void rbfv3_modelmatrixcomputeproductrec(rbf3evaluator* modelmatrix,
+     /* Real    */ ae_vector* c,
+     /* Integer */ ae_vector* rowidx,
+     /* Real    */ ae_vector* r,
+     ae_int_t idx0,
+     ae_int_t idx1,
+     ae_bool toplevelcall,
+     ae_state *_state);
+void _spawn_rbfv3_modelmatrixcomputeproductrec(rbf3evaluator* modelmatrix,
+    /* Real    */ ae_vector* c,
+    /* Integer */ ae_vector* rowidx,
+    /* Real    */ ae_vector* r,
+    ae_int_t idx0,
+    ae_int_t idx1,
+    ae_bool toplevelcall, ae_task_group *_group, ae_bool smp_enabled, ae_state *_state);
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+void _task_rbfv3_modelmatrixcomputeproductrec(ae_task_data *_data, ae_state *_state);
+#endif
+ae_bool _trypexec_rbfv3_modelmatrixcomputeproductrec(rbf3evaluator* modelmatrix,
+    /* Real    */ ae_vector* c,
+    /* Integer */ ae_vector* rowidx,
+    /* Real    */ ae_vector* r,
+    ae_int_t idx0,
+    ae_int_t idx1,
+    ae_bool toplevelcall, ae_state *_state);
+static void rbfv3_modelmatrixcomputeproduct(rbf3evaluator* modelmatrix,
+     /* Real    */ ae_vector* c,
+     /* Real    */ ae_vector* r,
+     ae_state *_state);
+static void rbfv3_modelmatrixcomputeproductatnodes(rbf3evaluator* modelmatrix,
+     /* Real    */ ae_vector* c,
+     /* Integer */ ae_vector* idx,
+     ae_int_t m,
+     /* Real    */ ae_vector* r,
+     ae_state *_state);
+static ae_bool rbfv3_iscpdfunction(ae_int_t functype,
+     ae_int_t aterm,
+     ae_state *_state);
+
+
+#endif
 #if defined(AE_COMPILE_SPLINE2D) || !defined(AE_PARTIAL_BUILD)
 static double spline2d_cholreg = 1.0E-12;
 static double spline2d_lambdaregblocklls = 1.0E-6;
@@ -17984,6 +19301,9 @@ static void rbfv2_partialcalcrec(rbfv2model* s,
      double queryr2,
      /* Real    */ ae_vector* x,
      /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* dy,
+     /* Real    */ ae_vector* d2y,
+     ae_int_t needdy,
      ae_state *_state);
 static void rbfv2_partialrowcalcrec(rbfv2model* s,
      rbfv2calcbuffer* buf,
@@ -18107,6 +19427,7 @@ static double rbf_eps = 1.0E-6;
 static double rbf_rbffarradius = 6;
 static ae_int_t rbf_rbffirstversion = 0;
 static ae_int_t rbf_rbfversion2 = 2;
+static ae_int_t rbf_rbfversion3 = 3;
 static void rbf_rbfpreparenonserializablefields(rbfmodel* s,
      ae_state *_state);
 static void rbf_initializev1(ae_int_t nx,
@@ -18116,6 +19437,10 @@ static void rbf_initializev1(ae_int_t nx,
 static void rbf_initializev2(ae_int_t nx,
      ae_int_t ny,
      rbfv2model* s,
+     ae_state *_state);
+static void rbf_initializev3(ae_int_t nx,
+     ae_int_t ny,
+     rbfv3model* s,
      ae_state *_state);
 static void rbf_clearreportfields(rbfreport* rep, ae_state *_state);
 
@@ -39249,6 +40574,257 @@ void rbfv1tscalcbuf(rbfv1model* s,
 
 
 /*************************************************************************
+This function calculates values of the RBF model at the  given  point  and
+its derivatives, using external buffer object (internal temporaries of the
+RBF model are not modified).
+
+This function allows to use same RBF model object  in  different  threads,
+assuming  that  different   threads  use  different  instances  of  buffer
+structure.
+
+INPUT PARAMETERS:
+    S       -   RBF model, may be shared between different threads
+    Buf     -   buffer object created for this particular instance of  RBF
+                model with rbfcreatecalcbuffer().
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only 
+                leading NX will be used.
+    Y, DY   -   possibly preallocated arrays
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY]. Y is not reallocated when it
+                is larger than NY.
+    DY      -   derivatives, array[NY*NX]. DY is not reallocated when it
+                is larger than NY*NX.
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfv1tsdiffbuf(rbfv1model* s,
+     rbfv1calcbuffer* buf,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* dy,
+     ae_state *_state)
+{
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    ae_int_t kk;
+    ae_int_t lx;
+    ae_int_t tg;
+    double t;
+    double rcur;
+    double invrcur2;
+    double f;
+    double df;
+    double w;
+
+
+    ae_assert(x->cnt>=s->nx, "RBFDiffBuf: Length(X)<NX", _state);
+    ae_assert(isfinitevector(x, s->nx, _state), "RBFDiffBuf: X contains infinite or NaN values", _state);
+    if( y->cnt<s->ny )
+    {
+        ae_vector_set_length(y, s->ny, _state);
+    }
+    if( dy->cnt<s->ny*s->nx )
+    {
+        ae_vector_set_length(dy, s->ny*s->nx, _state);
+    }
+    for(i=0; i<=s->ny-1; i++)
+    {
+        y->ptr.p_double[i] = s->v.ptr.pp_double[i][rbfv1_mxnx];
+        for(j=0; j<=s->nx-1; j++)
+        {
+            y->ptr.p_double[i] = y->ptr.p_double[i]+s->v.ptr.pp_double[i][j]*x->ptr.p_double[j];
+            dy->ptr.p_double[i*s->nx+j] = s->v.ptr.pp_double[i][j];
+        }
+    }
+    if( s->nc==0 )
+    {
+        return;
+    }
+    rvectorsetlengthatleast(&buf->calcbufxcx, rbfv1_mxnx, _state);
+    for(i=0; i<=rbfv1_mxnx-1; i++)
+    {
+        buf->calcbufxcx.ptr.p_double[i] = 0.0;
+    }
+    for(i=0; i<=s->nx-1; i++)
+    {
+        buf->calcbufxcx.ptr.p_double[i] = x->ptr.p_double[i];
+    }
+    lx = kdtreetsqueryrnn(&s->tree, &buf->requestbuffer, &buf->calcbufxcx, s->rmax*rbfv1_rbffarradius, ae_true, _state);
+    kdtreetsqueryresultsx(&s->tree, &buf->requestbuffer, &buf->calcbufx, _state);
+    kdtreetsqueryresultstags(&s->tree, &buf->requestbuffer, &buf->calcbuftags, _state);
+    for(i=0; i<=s->ny-1; i++)
+    {
+        for(j=0; j<=lx-1; j++)
+        {
+            tg = buf->calcbuftags.ptr.p_int[j];
+            rcur = s->wr.ptr.pp_double[tg][0];
+            invrcur2 = 1/(rcur*rcur);
+            f = ae_exp(-(ae_sqr(buf->calcbufxcx.ptr.p_double[0]-buf->calcbufx.ptr.pp_double[j][0], _state)+ae_sqr(buf->calcbufxcx.ptr.p_double[1]-buf->calcbufx.ptr.pp_double[j][1], _state)+ae_sqr(buf->calcbufxcx.ptr.p_double[2]-buf->calcbufx.ptr.pp_double[j][2], _state))*invrcur2, _state);
+            df = -f;
+            for(k=0; k<=s->nl-1; k++)
+            {
+                w = s->wr.ptr.pp_double[tg][1+k*s->ny+i];
+                y->ptr.p_double[i] = y->ptr.p_double[i]+f*w;
+                for(kk=0; kk<=s->nx-1; kk++)
+                {
+                    dy->ptr.p_double[i*s->nx+kk] = dy->ptr.p_double[i*s->nx+kk]+w*df*invrcur2*2*(buf->calcbufxcx.ptr.p_double[kk]-buf->calcbufx.ptr.pp_double[j][kk]);
+                }
+                t = f*f;
+                f = t*t;
+                df = -f;
+                invrcur2 = 4*invrcur2;
+            }
+        }
+    }
+}
+
+
+/*************************************************************************
+This function calculates values of the RBF model at the  given  point  and
+its first/second  derivatives,  using  external  buffer  object  (internal
+temporaries of the RBF model are not modified).
+
+This function allows to use same RBF model object  in  different  threads,
+assuming  that  different   threads  use  different  instances  of  buffer
+structure.
+
+INPUT PARAMETERS:
+    S       -   RBF model, may be shared between different threads
+    Buf     -   buffer object created for this particular instance of  RBF
+                model with rbfcreatecalcbuffer().
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only 
+                leading NX will be used.
+    Y, DY, D2Y -   possibly preallocated arrays
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY]. Y is not reallocated when it
+                is larger than NY.
+    DY      -   derivatives, array[NY*NX]. DY is not reallocated when it
+                is larger than NY*NX.
+    D2Y     -   derivatives, array[NY*NX*NX]. D2Y is not reallocated when
+                it is larger than NY*NX*NX.
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfv1tshessbuf(rbfv1model* s,
+     rbfv1calcbuffer* buf,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* dy,
+     /* Real    */ ae_vector* d2y,
+     ae_state *_state)
+{
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    ae_int_t i0;
+    ae_int_t i1;
+    ae_int_t lx;
+    ae_int_t tg;
+    double t;
+    double rcur;
+    double invrcur2;
+    double f;
+    double df;
+    double d2f;
+    double w;
+
+
+    ae_assert(x->cnt>=s->nx, "RBFDiffBuf: Length(X)<NX", _state);
+    ae_assert(isfinitevector(x, s->nx, _state), "RBFDiffBuf: X contains infinite or NaN values", _state);
+    if( y->cnt<s->ny )
+    {
+        ae_vector_set_length(y, s->ny, _state);
+    }
+    if( dy->cnt<s->ny*s->nx )
+    {
+        ae_vector_set_length(dy, s->ny*s->nx, _state);
+    }
+    if( d2y->cnt<s->ny*s->nx*s->nx )
+    {
+        ae_vector_set_length(d2y, s->ny*s->nx*s->nx, _state);
+    }
+    for(i=0; i<=s->ny-1; i++)
+    {
+        y->ptr.p_double[i] = s->v.ptr.pp_double[i][rbfv1_mxnx];
+        for(j=0; j<=s->nx-1; j++)
+        {
+            y->ptr.p_double[i] = y->ptr.p_double[i]+s->v.ptr.pp_double[i][j]*x->ptr.p_double[j];
+            dy->ptr.p_double[i*s->nx+j] = s->v.ptr.pp_double[i][j];
+        }
+    }
+    rsetv(s->ny*s->nx*s->nx, 0.0, d2y, _state);
+    if( s->nc==0 )
+    {
+        return;
+    }
+    rvectorsetlengthatleast(&buf->calcbufxcx, rbfv1_mxnx, _state);
+    for(i=0; i<=rbfv1_mxnx-1; i++)
+    {
+        buf->calcbufxcx.ptr.p_double[i] = 0.0;
+    }
+    for(i=0; i<=s->nx-1; i++)
+    {
+        buf->calcbufxcx.ptr.p_double[i] = x->ptr.p_double[i];
+    }
+    lx = kdtreetsqueryrnn(&s->tree, &buf->requestbuffer, &buf->calcbufxcx, s->rmax*rbfv1_rbffarradius, ae_true, _state);
+    kdtreetsqueryresultsx(&s->tree, &buf->requestbuffer, &buf->calcbufx, _state);
+    kdtreetsqueryresultstags(&s->tree, &buf->requestbuffer, &buf->calcbuftags, _state);
+    for(i=0; i<=s->ny-1; i++)
+    {
+        for(j=0; j<=lx-1; j++)
+        {
+            tg = buf->calcbuftags.ptr.p_int[j];
+            rcur = s->wr.ptr.pp_double[tg][0];
+            invrcur2 = 1/(rcur*rcur);
+            f = ae_exp(-(ae_sqr(buf->calcbufxcx.ptr.p_double[0]-buf->calcbufx.ptr.pp_double[j][0], _state)+ae_sqr(buf->calcbufxcx.ptr.p_double[1]-buf->calcbufx.ptr.pp_double[j][1], _state)+ae_sqr(buf->calcbufxcx.ptr.p_double[2]-buf->calcbufx.ptr.pp_double[j][2], _state))*invrcur2, _state);
+            df = -f;
+            d2f = f;
+            for(k=0; k<=s->nl-1; k++)
+            {
+                w = s->wr.ptr.pp_double[tg][1+k*s->ny+i];
+                y->ptr.p_double[i] = y->ptr.p_double[i]+f*w;
+                for(i0=0; i0<=s->nx-1; i0++)
+                {
+                    for(i1=0; i1<=s->nx-1; i1++)
+                    {
+                        if( i0==i1 )
+                        {
+                            
+                            /*
+                             * Compute derivative and diagonal element of the Hessian
+                             */
+                            dy->ptr.p_double[i*s->nx+i0] = dy->ptr.p_double[i*s->nx+i0]+w*df*invrcur2*2*(buf->calcbufxcx.ptr.p_double[i0]-buf->calcbufx.ptr.pp_double[j][i0]);
+                            d2y->ptr.p_double[i*s->nx*s->nx+i0*s->nx+i1] = d2y->ptr.p_double[i*s->nx*s->nx+i0*s->nx+i1]+w*(d2f*invrcur2*invrcur2*4*ae_sqr(buf->calcbufxcx.ptr.p_double[i0]-buf->calcbufx.ptr.pp_double[j][i0], _state)+df*invrcur2*2);
+                        }
+                        else
+                        {
+                            
+                            /*
+                             * Compute off-diagonal element of the Hessian
+                             */
+                            d2y->ptr.p_double[i*s->nx*s->nx+i0*s->nx+i1] = d2y->ptr.p_double[i*s->nx*s->nx+i0*s->nx+i1]+w*d2f*invrcur2*invrcur2*4*(buf->calcbufxcx.ptr.p_double[i0]-buf->calcbufx.ptr.pp_double[j][i0])*(buf->calcbufxcx.ptr.p_double[i1]-buf->calcbufx.ptr.pp_double[j][i1]);
+                        }
+                    }
+                }
+                t = f*f;
+                f = t*t;
+                df = -f;
+                d2f = f;
+                invrcur2 = 4*invrcur2;
+            }
+        }
+    }
+}
+
+
+/*************************************************************************
 This function calculates values of the RBF model at the regular grid.
 
 Grid have N0*N1 points, with Point[I,J] = (X0[I], X1[J])
@@ -41161,6 +42737,6687 @@ void _rbfv1report_clear(void* _p)
 void _rbfv1report_destroy(void* _p)
 {
     rbfv1report *p = (rbfv1report*)_p;
+    ae_touch_ptr((void*)p);
+}
+
+
+#endif
+#if defined(AE_COMPILE_RBFV3) || !defined(AE_PARTIAL_BUILD)
+
+
+/*************************************************************************
+This function creates RBF  model  for  a  scalar (NY=1)  or  vector (NY>1)
+function in a NX-dimensional space (NX>=1).
+
+INPUT PARAMETERS:
+    NX      -   dimension of the space, NX>=1
+    NY      -   function dimension, NY>=1
+    BF      -   basis function type:
+                * 1 for biharmonic/multiquadric f=sqrt(r^2+alpha^2) (with f=r being a special case)
+                * 2 for polyharmonic f=r^2*ln(r)
+    BFP     -   basis function parameter:
+                * BF=0      parameter ignored
+
+OUTPUT PARAMETERS:
+    S       -   RBF model (initially equals to zero)
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfv3create(ae_int_t nx,
+     ae_int_t ny,
+     ae_int_t bf,
+     double bfp,
+     rbfv3model* s,
+     ae_state *_state)
+{
+
+    _rbfv3model_clear(s);
+
+    ae_assert(nx>=1, "RBFCreate: NX<1", _state);
+    ae_assert(ny>=1, "RBFCreate: NY<1", _state);
+    ae_assert(bf==1||bf==2, "RBFCreate: unsupported basis function type", _state);
+    ae_assert(ae_isfinite(bfp, _state)&&ae_fp_greater_eq(bfp,(double)(0)), "RBFCreate: infinite or negative basis function parameter", _state);
+    
+    /*
+     * Serializable parameters
+     */
+    s->nx = nx;
+    s->ny = ny;
+    s->bftype = bf;
+    s->bfparam = bfp;
+    s->nc = 0;
+    rsetallocv(nx, 1.0, &s->s, _state);
+    rsetallocm(ny, nx+1, 0.0, &s->v, _state);
+    rbfv3_allocatecalcbuffer(s, &s->calcbuf, _state);
+    
+    /*
+     * Debug counters
+     */
+    s->dbgregqrusedforddm = ae_false;
+}
+
+
+/*************************************************************************
+This function creates buffer  structure  which  can  be  used  to  perform
+parallel  RBF  model  evaluations  (with  one  RBF  model  instance  being
+used from multiple threads, as long as  different  threads  use  different
+instances of buffer).
+
+This buffer object can be used with  rbftscalcbuf()  function  (here  "ts"
+stands for "thread-safe", "buf" is a suffix which denotes  function  which
+reuses previously allocated output space).
+
+How to use it:
+* create RBF model structure with rbfcreate()
+* load data, tune parameters
+* call rbfbuildmodel()
+* call rbfcreatecalcbuffer(), once per thread working with RBF model  (you
+  should call this function only AFTER call to rbfbuildmodel(), see  below
+  for more information)
+* call rbftscalcbuf() from different threads,  with  each  thread  working
+  with its own copy of buffer object.
+
+INPUT PARAMETERS
+    S           -   RBF model
+
+OUTPUT PARAMETERS
+    Buf         -   external buffer.
+    
+    
+IMPORTANT: buffer object should be used only with  RBF model object  which
+           was used to initialize buffer. Any attempt to use buffer   with
+           different object is dangerous - you may  get  memory  violation
+           error because sizes of internal arrays do not fit to dimensions
+           of RBF structure.
+           
+IMPORTANT: you  should  call  this function only for model which was built
+           with rbfbuildmodel() function, after successful  invocation  of
+           rbfbuildmodel().  Sizes   of   some   internal  structures  are
+           determined only after model is built, so buffer object  created
+           before model  construction  stage  will  be  useless  (and  any
+           attempt to use it will result in exception).
+
+  -- ALGLIB --
+     Copyright 02.04.2022 by Sergey Bochkanov
+*************************************************************************/
+void rbfv3createcalcbuffer(rbfv3model* s,
+     rbfv3calcbuffer* buf,
+     ae_state *_state)
+{
+
+    _rbfv3calcbuffer_clear(buf);
+
+    rbfv3_allocatecalcbuffer(s, buf, _state);
+}
+
+
+/*************************************************************************
+This function builds hierarchical RBF model.
+
+INPUT PARAMETERS:
+    X       -   array[N,S.NX], X-values
+    Y       -   array[N,S.NY], Y-values
+    ScaleVec-   array[S.NX], vector of per-dimension scales
+    N       -   points count
+    BFtype  -   basis function type:
+                * 1 for biharmonic spline f=r or multiquadric f=sqrt(r^2+param^2)
+                * 2 for thin plate spline f=r^2*ln(r)
+    BFParam -   for BFType=1 zero value means biharmonic, nonzero means multiquadric
+                ignored for BFType=2
+    LambdaV -   regularization parameter
+    ATerm   -   polynomial term type:
+                * 1 for linear term (STRONGLY RECOMMENDED)
+                * 2 for constant term (may break convergence guarantees for thin plate splines)
+                * 3 for zero term (may break convergence guarantees for all types of splines)
+    S       -   RBF model, already initialized by RBFCreate() call.
+    progress10000- variable used for progress reports, it is regularly set
+                to the current progress multiplied by 10000, in order to
+                get value in [0,10000] range. The rationale for such scaling
+                is that it allows us to use integer type to store progress,
+                which has less potential for non-atomic corruption on unprotected
+                reads from another threads.
+                You can read this variable from some other thread to get
+                estimate of the current progress.
+                Initial value of this variable is ignored, it is written by
+                this function, but not read.
+    terminationrequest - variable used for termination requests; its initial
+                value must be False, and you can set it to True from some
+                other thread. This routine regularly checks this variable
+                and will terminate model construction shortly upon discovering
+                that termination was requested.
+    
+OUTPUT PARAMETERS:
+    S       -   updated model (for rep.terminationtype>0, unchanged otherwise)
+    Rep     -   report:
+                * Rep.TerminationType:
+                  *  1 - successful termination
+                  *  8 terminated by user via rbfrequesttermination()
+                Fields are used for debugging purposes:
+                * Rep.IterationsCount - iterations count of the GMRES solver
+
+NOTE:  failure  to  build  model will leave current state of the structure
+unchanged.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfv3build(/* Real    */ ae_matrix* xraw,
+     /* Real    */ ae_matrix* yraw,
+     ae_int_t nraw,
+     /* Real    */ ae_vector* scaleraw,
+     ae_int_t bftype,
+     double bfparamraw,
+     double lambdavraw,
+     ae_int_t aterm,
+     rbfv3model* s,
+     ae_int_t* progress10000,
+     ae_bool* terminationrequest,
+     rbfv3report* rep,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    double tol;
+    ae_int_t n;
+    ae_int_t nx;
+    ae_int_t ny;
+    double bfparamscaled;
+    double lambdavwrk;
+    double rescaledby;
+    double mergetol;
+    ae_int_t matrixformat;
+    ae_int_t acbfbatch;
+    ae_int_t nglobal;
+    ae_int_t nlocal;
+    ae_int_t ncorrection;
+    ae_int_t nbatch;
+    ae_int_t nneighbors;
+    ae_int_t ncoarse;
+    ae_matrix xscaled;
+    ae_matrix yscaled;
+    ae_matrix xcoarse;
+    ae_matrix x1t;
+    rbf3evaluator bfmatrix;
+    ae_vector b;
+    ae_vector x0;
+    ae_vector x1;
+    ae_vector y0;
+    ae_vector y1;
+    ae_vector sft;
+    ae_vector scalewrk;
+    ae_matrix c2;
+    ae_matrix res;
+    ae_matrix upd0;
+    ae_matrix upd1;
+    ae_matrix ortbasis;
+    ae_int_t ortbasissize;
+    ae_vector raw2wrkmap;
+    ae_vector wrk2rawmap;
+    ae_vector idummy;
+    sparsematrix sp;
+    sparsesolverstate ss;
+    sparsesolverreport ssrep;
+    rbf3ddmsolver ddmsolver;
+    double resnrm;
+    double res0nrm;
+    ae_int_t iteridx;
+    ae_int_t yidx;
+    ae_bool dotrace;
+    ae_bool dodetailedtrace;
+    fblsgmresstate gmressolver;
+    double orterr;
+    ae_int_t timeprec;
+    ae_int_t timedesign;
+    ae_int_t timeddminit;
+    ae_int_t timeddmsolve;
+    ae_int_t timecorrinit;
+    ae_int_t timecorrsolve;
+    ae_int_t timereeval;
+    ae_int_t timetotal;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    double v;
+    double vv;
+    ae_matrix refrhs;
+    ae_vector refrhs1;
+    ae_vector refsol1;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&xscaled, 0, sizeof(xscaled));
+    memset(&yscaled, 0, sizeof(yscaled));
+    memset(&xcoarse, 0, sizeof(xcoarse));
+    memset(&x1t, 0, sizeof(x1t));
+    memset(&bfmatrix, 0, sizeof(bfmatrix));
+    memset(&b, 0, sizeof(b));
+    memset(&x0, 0, sizeof(x0));
+    memset(&x1, 0, sizeof(x1));
+    memset(&y0, 0, sizeof(y0));
+    memset(&y1, 0, sizeof(y1));
+    memset(&sft, 0, sizeof(sft));
+    memset(&scalewrk, 0, sizeof(scalewrk));
+    memset(&c2, 0, sizeof(c2));
+    memset(&res, 0, sizeof(res));
+    memset(&upd0, 0, sizeof(upd0));
+    memset(&upd1, 0, sizeof(upd1));
+    memset(&ortbasis, 0, sizeof(ortbasis));
+    memset(&raw2wrkmap, 0, sizeof(raw2wrkmap));
+    memset(&wrk2rawmap, 0, sizeof(wrk2rawmap));
+    memset(&idummy, 0, sizeof(idummy));
+    memset(&sp, 0, sizeof(sp));
+    memset(&ss, 0, sizeof(ss));
+    memset(&ssrep, 0, sizeof(ssrep));
+    memset(&ddmsolver, 0, sizeof(ddmsolver));
+    memset(&gmressolver, 0, sizeof(gmressolver));
+    memset(&refrhs, 0, sizeof(refrhs));
+    memset(&refrhs1, 0, sizeof(refrhs1));
+    memset(&refsol1, 0, sizeof(refsol1));
+    _rbfv3report_clear(rep);
+    ae_matrix_init(&xscaled, 0, 0, DT_REAL, _state, ae_true);
+    ae_matrix_init(&yscaled, 0, 0, DT_REAL, _state, ae_true);
+    ae_matrix_init(&xcoarse, 0, 0, DT_REAL, _state, ae_true);
+    ae_matrix_init(&x1t, 0, 0, DT_REAL, _state, ae_true);
+    _rbf3evaluator_init(&bfmatrix, _state, ae_true);
+    ae_vector_init(&b, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&x0, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&x1, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&y0, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&y1, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&sft, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&scalewrk, 0, DT_REAL, _state, ae_true);
+    ae_matrix_init(&c2, 0, 0, DT_REAL, _state, ae_true);
+    ae_matrix_init(&res, 0, 0, DT_REAL, _state, ae_true);
+    ae_matrix_init(&upd0, 0, 0, DT_REAL, _state, ae_true);
+    ae_matrix_init(&upd1, 0, 0, DT_REAL, _state, ae_true);
+    ae_matrix_init(&ortbasis, 0, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&raw2wrkmap, 0, DT_INT, _state, ae_true);
+    ae_vector_init(&wrk2rawmap, 0, DT_INT, _state, ae_true);
+    ae_vector_init(&idummy, 0, DT_INT, _state, ae_true);
+    _sparsematrix_init(&sp, _state, ae_true);
+    _sparsesolverstate_init(&ss, _state, ae_true);
+    _sparsesolverreport_init(&ssrep, _state, ae_true);
+    _rbf3ddmsolver_init(&ddmsolver, _state, ae_true);
+    _fblsgmresstate_init(&gmressolver, _state, ae_true);
+    ae_matrix_init(&refrhs, 0, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&refrhs1, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&refsol1, 0, DT_REAL, _state, ae_true);
+
+    mergetol = 1000*ae_machineepsilon;
+    tol = 1.0E-6;
+    ae_assert(s->nx>0, "RBFV3Build: incorrect NX", _state);
+    ae_assert(s->ny>0, "RBFV3Build: incorrect NY", _state);
+    ae_assert((bftype==1||bftype==2)||bftype==3, "RBFV3Build: incorrect BFType", _state);
+    ae_assert((aterm==1||aterm==2)||aterm==3, "RBFV3Build: incorrect BFType", _state);
+    for(j=0; j<=s->nx-1; j++)
+    {
+        ae_assert(ae_fp_greater(scaleraw->ptr.p_double[j],(double)(0)), "RBFV2BuildHierarchical: incorrect ScaleVec", _state);
+    }
+    nx = s->nx;
+    ny = s->ny;
+    bfparamscaled = bfparamraw;
+    
+    /*
+     * Trace output (if needed)
+     */
+    dotrace = ae_is_trace_enabled("RBF");
+    dodetailedtrace = dotrace&&ae_is_trace_enabled("RBF.DETAILED");
+    if( dotrace )
+    {
+        ae_trace("\n\n");
+        ae_trace("////////////////////////////////////////////////////////////////////////////////////////////////////\n");
+        ae_trace("// DDM-RBF builder started                                                                        //\n");
+        ae_trace("////////////////////////////////////////////////////////////////////////////////////////////////////\n");
+    }
+    
+    /*
+     * Clean up communication and report fields
+     */
+    *progress10000 = 0;
+    rep->maxerror = (double)(0);
+    rep->rmserror = (double)(0);
+    rep->iterationscount = 0;
+    timeprec = 0;
+    timedesign = 0;
+    timeddminit = 0;
+    timeddmsolve = 0;
+    timecorrinit = 0;
+    timecorrsolve = 0;
+    timereeval = 0;
+    timetotal = 0-ae_tickcount();
+    
+    /*
+     * Quick exit when we have no points
+     */
+    if( nraw==0 )
+    {
+        rbfv3_zerofill(s, nx, ny, _state);
+        rep->terminationtype = 1;
+        *progress10000 = 10000;
+        ae_frame_leave(_state);
+        return;
+    }
+    
+    /*
+     * Preprocess dataset (scale points, merge nondistinct ones)
+     */
+    rbfv3_preprocessdataset(xraw, mergetol, yraw, scaleraw, nraw, nx, ny, bftype, bfparamraw, lambdavraw, &xscaled, &yscaled, &raw2wrkmap, &wrk2rawmap, &n, &scalewrk, &sft, &bfparamscaled, &lambdavwrk, &rescaledby, _state);
+    rallocm(nx+1, n, &x1t, _state);
+    for(i=0; i<=n-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            x1t.ptr.pp_double[j][i] = xscaled.ptr.pp_double[i][j];
+        }
+        x1t.ptr.pp_double[nx][i] = 1.0;
+    }
+    
+    /*
+     * Compute design matrix
+     */
+    matrixformat = 1;
+    if( dotrace )
+    {
+        ae_trace("=== MODEL MATRIX INITIALIZATION STARTED ============================================================\n");
+        ae_trace("N           = %0d\nNX          = %0d\nNY          = %0d\n",
+            (int)(n),
+            (int)(nx),
+            (int)(ny));
+        ae_trace("BFType      = %0d",
+            (int)(bftype));
+        if( bftype==1&&ae_fp_greater(bfparamraw,(double)(0)) )
+        {
+            ae_trace("  ( f=sqrt(r^2+alpha^2), alpha=%0.3f, multiquadric with manual radius)",
+                (double)(bfparamraw));
+        }
+        if( bftype==1&&ae_fp_eq(bfparamraw,(double)(0)) )
+        {
+            ae_trace("  ( f=r, biharmonic spline )");
+        }
+        if( bftype==1&&ae_fp_less(bfparamraw,(double)(0)) )
+        {
+            ae_trace("  ( f=sqrt(r^2+alpha^2), alpha=AUTO*%0.3f=%0.2e, multiquadric )",
+                (double)(-bfparamraw),
+                (double)(bfparamscaled));
+        }
+        if( bftype==2 )
+        {
+            ae_trace("  ( f=log(r)*r^2, thin plate spline )");
+        }
+        if( bftype==3 )
+        {
+            ae_trace("  ( f=r^3 )");
+        }
+        ae_trace("\n");
+        ae_trace("Polinom.term= %0d ",
+            (int)(aterm));
+        if( aterm==1 )
+        {
+            ae_trace("(linear term)");
+        }
+        if( aterm==2 )
+        {
+            ae_trace("(constant term)");
+        }
+        if( aterm==3 )
+        {
+            ae_trace("(zero term)");
+        }
+        ae_trace("\n");
+        ae_trace("LambdaV     = %0.2e (raw value of the smoothing parameter; effective value after adjusting for data spread is %0.2e)\n",
+            (double)(lambdavraw),
+            (double)(lambdavwrk));
+        ae_trace("VarScales   = ");
+        tracevectore3(scaleraw, 0, nx, _state);
+        ae_trace(" (raw values of variable scales)\n");
+    }
+    timedesign = timedesign-ae_tickcount();
+    rbfv3_modelmatrixinit(&xscaled, n, nx, bftype, bfparamscaled, matrixformat, &bfmatrix, _state);
+    timedesign = timedesign+ae_tickcount();
+    if( dotrace )
+    {
+        ae_trace("> model matrix initialized in %0d ms\n",
+            (int)(timedesign));
+    }
+    
+    /*
+     * Build orthogonal basis of the subspace spanned by polynomials of 1st degree.
+     * This basis is used later to check orthogonality conditions for the coefficients.
+     */
+    rallocm(nx+1, n, &ortbasis, _state);
+    rsetr(n, 1/ae_sqrt((double)(n), _state), &ortbasis, 0, _state);
+    ortbasissize = 1;
+    rallocv(n, &x0, _state);
+    for(k=0; k<=nx-1; k++)
+    {
+        for(j=0; j<=n-1; j++)
+        {
+            x0.ptr.p_double[j] = xscaled.ptr.pp_double[j][k];
+        }
+        v = ae_sqrt(rdotv2(n, &x0, _state), _state);
+        rowwisegramschmidt(&ortbasis, ortbasissize, n, &x0, &x0, ae_false, _state);
+        vv = ae_sqrt(rdotv2(n, &x0, _state), _state);
+        if( ae_fp_greater(vv,ae_sqrt(ae_machineepsilon, _state)*(v+1)) )
+        {
+            rcopymulvr(n, 1/vv, &x0, &ortbasis, ortbasissize, _state);
+            ortbasissize = ortbasissize+1;
+        }
+    }
+    
+    /*
+     * Build preconditioner
+     */
+    nglobal = 0;
+    nlocal = ae_maxint(ae_round(ae_pow(5.5, (double)(nx), _state), _state), 25, _state);
+    ncorrection = ae_round(ae_pow((double)(5), (double)(nx), _state), _state);
+    acbfbatch = 32;
+    if( dotrace )
+    {
+        ae_trace("=== PRECONDITIONER CONSTRUCTION STARTED ============================================================\n");
+        ae_trace("nglobal     = %0d\nnlocal      = %0d\nncorrection = %0d\nnbatch      = %0d\n",
+            (int)(nglobal),
+            (int)(nlocal),
+            (int)(ncorrection),
+            (int)(acbfbatch));
+    }
+    timeprec = timeprec-ae_tickcount();
+    rbfv3_computeacbfpreconditioner(&xscaled, n, nx, bftype, bfparamscaled, aterm, acbfbatch, nglobal, nlocal, ncorrection, 5, 2, lambdavwrk, &sp, _state);
+    timeprec = timeprec+ae_tickcount();
+    if( dotrace )
+    {
+        ae_trace("> ACBF preconditioner computed in %0d ms\n",
+            (int)(timeprec));
+    }
+    
+    /*
+     * DDM
+     */
+    if( dotrace )
+    {
+        ae_trace("=== DOMAIN DECOMPOSITION METHOD STARTED ============================================================\n");
+    }
+    rsetallocm(n+nx+1, ny, 0.0, &c2, _state);
+    nneighbors = ae_round(ae_pow((double)(5), (double)(nx), _state), _state);
+    if( nx==1 )
+    {
+        nbatch = imin2(100, n, _state);
+    }
+    else
+    {
+        if( nx==2 )
+        {
+            nbatch = imin2(100, n, _state);
+        }
+        else
+        {
+            nbatch = imin3(ae_round(ae_pow((double)(10), (double)(nx), _state), _state), 1000, n, _state);
+        }
+    }
+    ncoarse = ae_round(ae_maxreal((double)(4), ae_pow(3.0, (double)(nx), _state), _state)*((double)n/(double)nbatch+1), _state);
+    ncoarse = ae_maxint(ncoarse, ae_round(ae_pow((double)(4), (double)(nx), _state), _state), _state);
+    ncoarse = ae_minint(ncoarse, n, _state);
+    if( dotrace )
+    {
+        ae_trace("> problem metrics and settings\n");
+        ae_trace("NNeighbors  = %0d\n",
+            (int)(nneighbors));
+        ae_trace("NBatch      = %0d\n",
+            (int)(nbatch));
+        ae_trace("NCoarse     = %0d\n",
+            (int)(ncoarse));
+    }
+    rbfv3_ddmsolverinit(&xscaled, rescaledby, n, nx, &bfmatrix, bftype, bfparamscaled, lambdavwrk, aterm, &sp, nneighbors, nbatch, ncoarse, dotrace, dodetailedtrace, &ddmsolver, &timeddminit, &timecorrinit, _state);
+    if( dotrace )
+    {
+        ae_trace("> DDM initialization done in %0d ms, %0d subproblems solved (%0d well-conditioned, %0d ill-conditioned)\n",
+            (int)(timeddminit),
+            (int)(ddmsolver.subproblemscnt),
+            (int)(ddmsolver.cntlu),
+            (int)(ddmsolver.cntregqr));
+    }
+    
+    /*
+     * Use preconditioned GMRES
+     */
+    rep->rmserror = (double)(0);
+    rep->maxerror = (double)(0);
+    rep->iterationscount = 0;
+    for(yidx=0; yidx<=ny-1; yidx++)
+    {
+        if( dotrace )
+        {
+            ae_trace("> solving for component %2d:\n",
+                (int)(yidx));
+        }
+        rsetallocv(n+nx+1, 0.0, &y0, _state);
+        rsetallocv(n+nx+1, 0.0, &y1, _state);
+        rcopycv(n, &yscaled, yidx, &y0, _state);
+        fblsgmrescreate(&y0, n, ae_minint(rbfv3_maxddmits, n, _state), &gmressolver, _state);
+        gmressolver.epsres = tol;
+        gmressolver.epsred = rbfv3_epsred;
+        iteridx = 0;
+        while(fblsgmresiteration(&gmressolver, _state))
+        {
+            if( dotrace )
+            {
+                ae_trace(">> DDM iteration %2d: %0.2e relative residual\n",
+                    (int)(iteridx),
+                    (double)(gmressolver.reprelres));
+            }
+            rallocv(n+nx+1, &y0, _state);
+            rallocv(n+nx+1, &y1, _state);
+            rbfv3_ddmsolverrun1(&ddmsolver, &gmressolver.x, n, nx, &sp, &bfmatrix, &y0, &timeddmsolve, &timecorrsolve, _state);
+            timereeval = timereeval-ae_tickcount();
+            rbfv3_modelmatrixcomputeproduct(&bfmatrix, &y0, &y1, _state);
+            rgemvx(n, nx+1, 1.0, &x1t, 0, 0, 1, &y0, n, 1.0, &y1, 0, _state);
+            for(i=0; i<=n-1; i++)
+            {
+                y1.ptr.p_double[i] = y1.ptr.p_double[i]+lambdavwrk*y0.ptr.p_double[i];
+            }
+            timereeval = timereeval+ae_tickcount();
+            rcopyv(n, &y1, &gmressolver.ax, _state);
+            rep->iterationscount = rep->iterationscount+1;
+            iteridx = iteridx+1;
+        }
+        rbfv3_ddmsolverrun1(&ddmsolver, &gmressolver.xs, n, nx, &sp, &bfmatrix, &x1, &timeddmsolve, &timecorrsolve, _state);
+        rcopyvc(n+nx+1, &x1, &c2, yidx, _state);
+        
+        /*
+         * Compute predictions and errors
+         *
+         * NOTE: because dataset preprocessing may reorder and merge points we have
+         *       to use raw-to-work mapping in order to be able to compute correct
+         *       error metrics.
+         */
+        timereeval = timereeval-ae_tickcount();
+        rbfv3_modelmatrixcomputeproduct(&bfmatrix, &x1, &y1, _state);
+        rgemvx(n, nx+1, 1.0, &x1t, 0, 0, 1, &x1, n, 1.0, &y1, 0, _state);
+        timereeval = timereeval+ae_tickcount();
+        resnrm = (double)(0);
+        res0nrm = (double)(0);
+        for(i=0; i<=n-1; i++)
+        {
+            resnrm = resnrm+ae_sqr(yscaled.ptr.pp_double[i][yidx]-y1.ptr.p_double[i]-lambdavwrk*x1.ptr.p_double[i], _state);
+            res0nrm = res0nrm+ae_sqr(yscaled.ptr.pp_double[i][yidx], _state);
+        }
+        resnrm = ae_sqrt(resnrm, _state);
+        res0nrm = ae_sqrt(res0nrm, _state);
+        for(i=0; i<=nraw-1; i++)
+        {
+            v = yraw->ptr.pp_double[i][yidx]-y1.ptr.p_double[raw2wrkmap.ptr.p_int[i]];
+            rep->maxerror = ae_maxreal(rep->maxerror, ae_fabs(v, _state), _state);
+            rep->rmserror = rep->rmserror+v*v;
+        }
+        if( dotrace )
+        {
+            ae_trace(">> done with %0.2e relative residual, GMRES completion code %0d\n",
+                (double)(resnrm/coalesce(res0nrm, (double)(1), _state)),
+                (int)(gmressolver.retcode));
+        }
+    }
+    rep->rmserror = ae_sqrt(rep->rmserror/(nraw*ny), _state);
+    timetotal = timetotal+ae_tickcount();
+    if( dotrace )
+    {
+        rallocv(n, &y0, _state);
+        orterr = (double)(0);
+        for(k=0; k<=ny-1; k++)
+        {
+            rcopycv(n, &c2, k, &y0, _state);
+            for(i=0; i<=ortbasissize-1; i++)
+            {
+                orterr = ae_maxreal(orterr, ae_fabs(rdotvr(n, &y0, &ortbasis, i, _state), _state), _state);
+            }
+        }
+        ae_trace("=== PRINTING RBF SOLVER RESULTS ====================================================================\n");
+        ae_trace("> errors\n");
+        ae_trace("RMS.err     = %0.2e\n",
+            (double)(rep->rmserror));
+        ae_trace("MAX.err     = %0.2e\n",
+            (double)(rep->maxerror));
+        ae_trace("ORT.err     = %0.2e (orthogonality condition)\n",
+            (double)(orterr));
+        ae_trace("> DDM iterations\n");
+        ae_trace("ItsCnt      = %0d\n",
+            (int)(rep->iterationscount));
+        ae_trace("> total running time is %0d ms, including:\n",
+            (int)(timetotal));
+        ae_trace(">> model matrix generation               %8d ms\n",
+            (int)(timedesign));
+        ae_trace(">> ACBF preconditioner construction      %8d ms\n",
+            (int)(timeprec));
+        ae_trace(">> DDM solver initialization             %8d ms\n",
+            (int)(timeddminit));
+        ae_trace(">> DDM corrector initialization          %8d ms\n",
+            (int)(timecorrinit));
+        ae_trace(">> DDM solution phase                    %8d ms\n",
+            (int)(timeddmsolve));
+        ae_trace(">> DDM correction phase                  %8d ms\n",
+            (int)(timecorrsolve));
+        ae_trace(">> DDM solver model reevaluation         %8d ms\n",
+            (int)(timereeval));
+    }
+    s->bftype = bftype;
+    s->bfparam = bfparamscaled;
+    rcopyallocv(nx, &scalewrk, &s->s, _state);
+    for(j=0; j<=ny-1; j++)
+    {
+        s->v.ptr.pp_double[j][nx] = c2.ptr.pp_double[n+nx][j];
+        for(i=0; i<=nx-1; i++)
+        {
+            s->v.ptr.pp_double[j][i] = c2.ptr.pp_double[n+i][j]/scalewrk.ptr.p_double[i];
+            s->v.ptr.pp_double[j][nx] = s->v.ptr.pp_double[j][nx]-c2.ptr.pp_double[n+i][j]*sft.ptr.p_double[i]/scalewrk.ptr.p_double[i];
+        }
+    }
+    rallocv(n*(nx+ny), &s->cw, _state);
+    for(i=0; i<=n-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            s->cw.ptr.p_double[i*(nx+ny)+j] = xscaled.ptr.pp_double[i][j]+sft.ptr.p_double[j]/scalewrk.ptr.p_double[j];
+        }
+        for(j=0; j<=ny-1; j++)
+        {
+            s->cw.ptr.p_double[i*(nx+ny)+nx+j] = c2.ptr.pp_double[i][j];
+        }
+    }
+    icopyallocv(n, &wrk2rawmap, &s->pointindexes, _state);
+    s->nc = n;
+    rbfv3_createfastevaluator(s, _state);
+    
+    /*
+     * Set up debug fields
+     */
+    s->dbgregqrusedforddm = ddmsolver.cntregqr>0;
+    
+    /*
+     * Update progress reports
+     */
+    rep->terminationtype = 1;
+    *progress10000 = 10000;
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+Serializer: allocation
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfv3alloc(ae_serializer* s, rbfv3model* model, ae_state *_state)
+{
+
+
+    
+    /*
+     * Data
+     */
+    ae_serializer_alloc_entry(s);
+    ae_serializer_alloc_entry(s);
+    ae_serializer_alloc_entry(s);
+    ae_serializer_alloc_entry(s);
+    ae_serializer_alloc_entry(s);
+    allocrealarray(s, &model->s, model->nx, _state);
+    allocrealmatrix(s, &model->v, model->ny, model->nx+1, _state);
+    allocrealarray(s, &model->cw, model->nc*(model->nx+model->ny), _state);
+    allocintegerarray(s, &model->pointindexes, model->nc, _state);
+    
+    /*
+     * End of stream, no additional data
+     */
+    ae_serializer_alloc_entry(s);
+}
+
+
+/*************************************************************************
+Serializer: serialization
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfv3serialize(ae_serializer* s, rbfv3model* model, ae_state *_state)
+{
+
+
+    
+    /*
+     * Data
+     */
+    ae_serializer_serialize_int(s, model->nx, _state);
+    ae_serializer_serialize_int(s, model->ny, _state);
+    ae_serializer_serialize_int(s, model->bftype, _state);
+    ae_serializer_serialize_double(s, model->bfparam, _state);
+    ae_serializer_serialize_int(s, model->nc, _state);
+    serializerealarray(s, &model->s, model->nx, _state);
+    serializerealmatrix(s, &model->v, model->ny, model->nx+1, _state);
+    serializerealarray(s, &model->cw, model->nc*(model->nx+model->ny), _state);
+    serializeintegerarray(s, &model->pointindexes, model->nc, _state);
+    
+    /*
+     * End of stream, no additional data
+     */
+    ae_serializer_serialize_int(s, 117256, _state);
+}
+
+
+/*************************************************************************
+Serializer: unserialization
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfv3unserialize(ae_serializer* s,
+     rbfv3model* model,
+     ae_state *_state)
+{
+    ae_int_t nx;
+    ae_int_t ny;
+    ae_int_t bftype;
+    ae_int_t k;
+    double bfparam;
+
+    _rbfv3model_clear(model);
+
+    
+    /*
+     * Unserialize primary model parameters, initialize model.
+     *
+     * It is necessary to call RBFCreate() because some internal fields
+     * which are NOT unserialized will need initialization.
+     */
+    ae_serializer_unserialize_int(s, &nx, _state);
+    ae_serializer_unserialize_int(s, &ny, _state);
+    ae_serializer_unserialize_int(s, &bftype, _state);
+    ae_serializer_unserialize_double(s, &bfparam, _state);
+    rbfv3create(nx, ny, bftype, bfparam, model, _state);
+    ae_serializer_unserialize_int(s, &model->nc, _state);
+    unserializerealarray(s, &model->s, _state);
+    unserializerealmatrix(s, &model->v, _state);
+    unserializerealarray(s, &model->cw, _state);
+    unserializeintegerarray(s, &model->pointindexes, _state);
+    
+    /*
+     * End of stream, check that no additional data is present
+     */
+    ae_serializer_unserialize_int(s, &k, _state);
+    ae_assert(k==117256, "RBFV3Unserialize: unexpected payload detected in the data stream. Integrity check failed", _state);
+    
+    /*
+     * Finalize construction
+     */
+    rbfv3_createfastevaluator(model, _state);
+}
+
+
+/*************************************************************************
+This function calculates values of the RBF model in the given point.
+
+This function should be used when we have NY=1 (scalar function) and  NX=1
+(1-dimensional space).
+
+This function returns 0.0 when:
+* the model is not initialized
+* NX<>1
+ *NY<>1
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X0      -   X-coordinate, finite number
+
+RESULT:
+    value of the model or 0.0 (as defined above)
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+double rbfv3calc1(rbfv3model* s, double x0, ae_state *_state)
+{
+    double result;
+
+
+    ae_assert(ae_isfinite(x0, _state), "RBFCalc1: invalid value for X0 (X0 is Inf)!", _state);
+    if( s->ny!=1||s->nx!=1 )
+    {
+        result = (double)(0);
+        return result;
+    }
+    result = s->v.ptr.pp_double[0][0]*x0-s->v.ptr.pp_double[0][1];
+    s->calcbuf.x123.ptr.p_double[0] = x0;
+    rbfv3tscalcbuf(s, &s->calcbuf, &s->calcbuf.x123, &s->calcbuf.y123, _state);
+    result = s->calcbuf.y123.ptr.p_double[0];
+    return result;
+}
+
+
+/*************************************************************************
+This function calculates values of the RBF model in the given point.
+
+This function should be used when we have NY=1 (scalar function) and  NX=2
+(2-dimensional space). If you have 3-dimensional space, use RBFCalc3(). If
+you have general situation (NX-dimensional space, NY-dimensional function)
+you should use general, less efficient implementation RBFCalc().
+
+If  you  want  to  calculate  function  values  many times, consider using 
+RBFGridCalc2(), which is far more efficient than many subsequent calls  to
+RBFCalc2().
+
+This function returns 0.0 when:
+* model is not initialized
+* NX<>2
+ *NY<>1
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X0      -   first coordinate, finite number
+    X1      -   second coordinate, finite number
+
+RESULT:
+    value of the model or 0.0 (as defined above)
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+double rbfv3calc2(rbfv3model* s, double x0, double x1, ae_state *_state)
+{
+    double result;
+
+
+    ae_assert(ae_isfinite(x0, _state), "RBFCalc2: invalid value for X0 (X0 is Inf)!", _state);
+    ae_assert(ae_isfinite(x1, _state), "RBFCalc2: invalid value for X1 (X1 is Inf)!", _state);
+    if( s->ny!=1||s->nx!=2 )
+    {
+        result = (double)(0);
+        return result;
+    }
+    result = s->v.ptr.pp_double[0][0]*x0+s->v.ptr.pp_double[0][1]*x1+s->v.ptr.pp_double[0][2];
+    if( s->nc==0 )
+    {
+        return result;
+    }
+    s->calcbuf.x123.ptr.p_double[0] = x0;
+    s->calcbuf.x123.ptr.p_double[1] = x1;
+    rbfv3tscalcbuf(s, &s->calcbuf, &s->calcbuf.x123, &s->calcbuf.y123, _state);
+    result = s->calcbuf.y123.ptr.p_double[0];
+    return result;
+}
+
+
+/*************************************************************************
+This function calculates values of the RBF model in the given point.
+
+This function should be used when we have NY=1 (scalar function) and  NX=3
+(3-dimensional space). If you have 2-dimensional space, use RBFCalc2(). If
+you have general situation (NX-dimensional space, NY-dimensional function)
+you should use general, less efficient implementation RBFCalc().
+
+This function returns 0.0 when:
+* model is not initialized
+* NX<>3
+ *NY<>1
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X0      -   first coordinate, finite number
+    X1      -   second coordinate, finite number
+    X2      -   third coordinate, finite number
+
+RESULT:
+    value of the model or 0.0 (as defined above)
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+double rbfv3calc3(rbfv3model* s,
+     double x0,
+     double x1,
+     double x2,
+     ae_state *_state)
+{
+    double result;
+
+
+    ae_assert(ae_isfinite(x0, _state), "RBFCalc3: invalid value for X0 (X0 is Inf or NaN)!", _state);
+    ae_assert(ae_isfinite(x1, _state), "RBFCalc3: invalid value for X1 (X1 is Inf or NaN)!", _state);
+    ae_assert(ae_isfinite(x2, _state), "RBFCalc3: invalid value for X2 (X2 is Inf or NaN)!", _state);
+    if( s->ny!=1||s->nx!=3 )
+    {
+        result = (double)(0);
+        return result;
+    }
+    result = s->v.ptr.pp_double[0][0]*x0+s->v.ptr.pp_double[0][1]*x1+s->v.ptr.pp_double[0][2]*x2+s->v.ptr.pp_double[0][3];
+    if( s->nc==0 )
+    {
+        return result;
+    }
+    s->calcbuf.x123.ptr.p_double[0] = x0;
+    s->calcbuf.x123.ptr.p_double[1] = x1;
+    s->calcbuf.x123.ptr.p_double[2] = x2;
+    rbfv3tscalcbuf(s, &s->calcbuf, &s->calcbuf.x123, &s->calcbuf.y123, _state);
+    result = s->calcbuf.y123.ptr.p_double[0];
+    return result;
+}
+
+
+/*************************************************************************
+This function calculates values of the RBF model at the given point.
+
+Same as RBFCalc(), but does not reallocate Y when in is large enough to 
+store function values.
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only 
+                leading NX will be used.
+    Y       -   possibly preallocated array
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY]. Y is not reallocated when it
+                is larger than NY.
+
+  -- ALGLIB --
+     Copyright 13.12.2011 by Bochkanov Sergey
+*************************************************************************/
+void rbfv3calcbuf(rbfv3model* s,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* y,
+     ae_state *_state)
+{
+
+
+    rbfv3tscalcbuf(s, &s->calcbuf, x, y, _state);
+}
+
+
+/*************************************************************************
+This function calculates values of the RBF model at the given point, using
+external  buffer  object  (internal  temporaries  of  RBF  model  are  not
+modified).
+
+This function allows to use same RBF model object  in  different  threads,
+assuming  that  different   threads  use  different  instances  of  buffer
+structure.
+
+INPUT PARAMETERS:
+    S       -   RBF model, may be shared between different threads
+    Buf     -   buffer object created for this particular instance of  RBF
+                model with rbfcreatecalcbuffer().
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only 
+                leading NX will be used.
+    Y       -   possibly preallocated array
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY]. Y is not reallocated when it
+                is larger than NY.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfv3tscalcbuf(rbfv3model* s,
+     rbfv3calcbuffer* buf,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* y,
+     ae_state *_state)
+{
+    ae_int_t nx;
+    ae_int_t ny;
+    ae_int_t i;
+    ae_int_t j;
+    double distance0;
+    ae_int_t colidx;
+    ae_int_t srcidx;
+    ae_int_t widx;
+    ae_int_t curchunk;
+
+
+    ae_assert(x->cnt>=s->nx, "RBFV3TsCalcBuf: Length(X)<NX", _state);
+    ae_assert(isfinitevector(x, s->nx, _state), "RBFV3TsCalcBuf: X contains infinite or NaN values", _state);
+    nx = s->nx;
+    ny = s->ny;
+    
+    /*
+     * Handle linear term
+     */
+    if( y->cnt<ny )
+    {
+        ae_vector_set_length(y, ny, _state);
+    }
+    for(i=0; i<=ny-1; i++)
+    {
+        y->ptr.p_double[i] = s->v.ptr.pp_double[i][nx];
+        for(j=0; j<=nx-1; j++)
+        {
+            y->ptr.p_double[i] = y->ptr.p_double[i]+s->v.ptr.pp_double[i][j]*x->ptr.p_double[j];
+        }
+    }
+    if( s->nc==0 )
+    {
+        return;
+    }
+    
+    /*
+     * Handle RBF term
+     */
+    ae_assert((s->bftype==1||s->bftype==2)||s->bftype==3, "RBFV3TsCalcBuf: unsupported basis function type", _state);
+    for(j=0; j<=nx-1; j++)
+    {
+        buf->x.ptr.p_double[j] = x->ptr.p_double[j]/s->s.ptr.p_double[j];
+    }
+    rallocv(s->evaluator.chunksize, &buf->evalbuf.funcbuf, _state);
+    rallocv(s->evaluator.chunksize, &buf->evalbuf.wrkbuf, _state);
+    colidx = 0;
+    srcidx = 0;
+    widx = 0;
+    distance0 = 1.0E-50;
+    if( s->bftype==1 )
+    {
+        
+        /*
+         * Kernels that add squared parameter to the squared distance
+         */
+        distance0 = ae_sqr(s->bfparam, _state);
+    }
+    while(colidx<s->nc)
+    {
+        
+        /*
+         * Handle basecase with size at most ChunkSize*ChunkSize
+         */
+        curchunk = ae_minint(s->evaluator.chunksize, s->nc-colidx, _state);
+        rbfv3_computerowchunk(&s->evaluator, &buf->x, &buf->evalbuf, curchunk, srcidx, distance0, 0, _state);
+        for(i=0; i<=ny-1; i++)
+        {
+            y->ptr.p_double[i] = y->ptr.p_double[i]+rdotvr(curchunk, &buf->evalbuf.funcbuf, &s->wchunked, widx+i, _state);
+        }
+        colidx = colidx+curchunk;
+        srcidx = srcidx+nx;
+        widx = widx+ny;
+    }
+}
+
+
+/*************************************************************************
+This function calculates values of the RBF model at the  given  point  and
+its derivatives, using external buffer object (internal temporaries of the
+RBF model are not modified).
+
+This function allows to use same RBF model object  in  different  threads,
+assuming  that  different   threads  use  different  instances  of  buffer
+structure.
+
+INPUT PARAMETERS:
+    S       -   RBF model, may be shared between different threads
+    Buf     -   buffer object created for this particular instance of  RBF
+                model with rbfcreatecalcbuffer().
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only 
+                leading NX will be used.
+    Y, DY   -   possibly preallocated arrays
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY]. Y is not reallocated when it
+                is larger than NY.
+    DY      -   derivatives, array[NY*NX]. DY is not reallocated when it
+                is larger than NY*NX.
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfv3tsdiffbuf(rbfv3model* s,
+     rbfv3calcbuffer* buf,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* dy,
+     ae_state *_state)
+{
+    ae_int_t nx;
+    ae_int_t ny;
+    ae_int_t i;
+    ae_int_t j;
+    double smalldist2;
+    ae_bool nograd;
+    ae_int_t colidx;
+    ae_int_t srcidx;
+    ae_int_t widx;
+    ae_int_t curchunk;
+    ae_int_t maxchunksize;
+    double distance0;
+
+
+    ae_assert(x->cnt>=s->nx, "RBFV3TsCalcBuf: Length(X)<NX", _state);
+    ae_assert(isfinitevector(x, s->nx, _state), "RBFV3TsCalcBuf: X contains infinite or NaN values", _state);
+    nx = s->nx;
+    ny = s->ny;
+    
+    /*
+     * Handle linear term
+     */
+    if( y->cnt<ny )
+    {
+        ae_vector_set_length(y, ny, _state);
+    }
+    if( dy->cnt<s->ny*s->nx )
+    {
+        ae_vector_set_length(dy, s->ny*s->nx, _state);
+    }
+    for(i=0; i<=ny-1; i++)
+    {
+        y->ptr.p_double[i] = s->v.ptr.pp_double[i][nx];
+        for(j=0; j<=nx-1; j++)
+        {
+            y->ptr.p_double[i] = y->ptr.p_double[i]+s->v.ptr.pp_double[i][j]*x->ptr.p_double[j];
+            dy->ptr.p_double[i*nx+j] = s->v.ptr.pp_double[i][j];
+        }
+    }
+    if( s->nc==0 )
+    {
+        return;
+    }
+    
+    /*
+     * Rescale X and DY to the internal scaling used by the RBF model
+     */
+    for(j=0; j<=nx-1; j++)
+    {
+        buf->x.ptr.p_double[j] = x->ptr.p_double[j]/s->s.ptr.p_double[j];
+    }
+    for(i=0; i<=ny-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            dy->ptr.p_double[i*nx+j] = dy->ptr.p_double[i*nx+j]*s->s.ptr.p_double[j];
+        }
+    }
+    
+    /*
+     * Prepare information necessary for the detection of the nonexistent gradient
+     */
+    nograd = ae_false;
+    smalldist2 = (rdotv2(nx, &buf->x, _state)+1.0)*ae_sqr(100*ae_machineepsilon, _state);
+    
+    /*
+     * Handle RBF term
+     */
+    ae_assert((s->bftype==1||s->bftype==2)||s->bftype==3, "RBFV3TsDiffBuf: unsupported basis function type", _state);
+    ae_assert(s->bftype!=1||ae_fp_greater_eq(s->bfparam,(double)(0)), "RBFV3TsDiffBuf: inconsistent BFType/BFParam", _state);
+    maxchunksize = s->evaluator.chunksize;
+    rallocv(maxchunksize, &buf->evalbuf.funcbuf, _state);
+    rallocv(maxchunksize, &buf->evalbuf.wrkbuf, _state);
+    rallocv(maxchunksize, &buf->evalbuf.df1, _state);
+    rallocm(nx, maxchunksize, &buf->evalbuf.deltabuf, _state);
+    rsetallocv(maxchunksize, 1.0E50, &buf->evalbuf.mindist2, _state);
+    colidx = 0;
+    srcidx = 0;
+    widx = 0;
+    distance0 = 1.0E-50;
+    if( s->bftype==1 )
+    {
+        
+        /*
+         * Kernels that add squared parameter to the squared distance
+         */
+        distance0 = ae_sqr(s->bfparam, _state);
+    }
+    while(colidx<s->nc)
+    {
+        
+        /*
+         * Handle basecase with size at most ChunkSize*ChunkSize
+         */
+        curchunk = ae_minint(maxchunksize, s->nc-colidx, _state);
+        rbfv3_computerowchunk(&s->evaluator, &buf->x, &buf->evalbuf, curchunk, srcidx, distance0, 1, _state);
+        for(j=0; j<=nx-1; j++)
+        {
+            rmergemulvr(curchunk, &buf->evalbuf.df1, &buf->evalbuf.deltabuf, j, _state);
+        }
+        for(i=0; i<=ny-1; i++)
+        {
+            y->ptr.p_double[i] = y->ptr.p_double[i]+rdotvr(curchunk, &buf->evalbuf.funcbuf, &s->wchunked, widx+i, _state);
+            for(j=0; j<=nx-1; j++)
+            {
+                dy->ptr.p_double[i*nx+j] = dy->ptr.p_double[i*nx+j]+2*rdotrr(curchunk, &s->wchunked, widx+i, &buf->evalbuf.deltabuf, j, _state);
+            }
+        }
+        colidx = colidx+curchunk;
+        srcidx = srcidx+nx;
+        widx = widx+ny;
+    }
+    if( s->bftype==1&&ae_fp_eq(s->bfparam,(double)(0)) )
+    {
+        
+        /*
+         * The kernel function is nondifferentiable at nodes, check whether we are close to one of the nodes or not
+         */
+        for(i=0; i<=maxchunksize-1; i++)
+        {
+            nograd = nograd||buf->evalbuf.mindist2.ptr.p_double[i]<=smalldist2;
+        }
+        if( nograd )
+        {
+            
+            /*
+             * The gradient is undefined at the trial point, flush it to zero
+             */
+            rsetv(ny*nx, 0.0, dy, _state);
+        }
+    }
+    
+    /*
+     * Rescale derivatives back
+     */
+    for(i=0; i<=ny-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            dy->ptr.p_double[i*nx+j] = dy->ptr.p_double[i*nx+j]/s->s.ptr.p_double[j];
+        }
+    }
+}
+
+
+/*************************************************************************
+This function calculates values of the RBF model at the  given  point  and
+its first and second derivatives, using external buffer  object  (internal
+temporaries of the RBF model are not modified).
+
+This function allows to use same RBF model object  in  different  threads,
+assuming  that  different   threads  use  different  instances  of  buffer
+structure.
+
+INPUT PARAMETERS:
+    S       -   RBF model, may be shared between different threads
+    Buf     -   buffer object created for this particular instance of  RBF
+                model with rbfcreatecalcbuffer().
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only 
+                leading NX will be used.
+    Y,DY,D2Y -  possibly preallocated arrays
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY]. Y is not reallocated when it
+                is larger than NY.
+    DY      -   derivatives, array[NY*NX]. DY is not reallocated when it
+                is larger than NY*NX.
+    D2Y     -   second derivatives, array[NY*NX*NX].
+                D2Y is not reallocated when it is larger than NY*NX*NX.
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfv3tshessbuf(rbfv3model* s,
+     rbfv3calcbuffer* buf,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* dy,
+     /* Real    */ ae_vector* d2y,
+     ae_state *_state)
+{
+    ae_int_t nx;
+    ae_int_t ny;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    ae_int_t k0;
+    ae_int_t k1;
+    ae_bool nearnode;
+    ae_bool nograd;
+    ae_bool nohess;
+    double smalldist2;
+    ae_int_t colidx;
+    ae_int_t srcidx;
+    ae_int_t widx;
+    ae_int_t curchunk;
+    ae_int_t maxchunksize;
+    double distance0;
+
+
+    ae_assert(x->cnt>=s->nx, "RBFV3TsCalcBuf: Length(X)<NX", _state);
+    ae_assert(isfinitevector(x, s->nx, _state), "RBFV3TsCalcBuf: X contains infinite or NaN values", _state);
+    nx = s->nx;
+    ny = s->ny;
+    
+    /*
+     * Handle linear term
+     */
+    if( y->cnt<ny )
+    {
+        ae_vector_set_length(y, ny, _state);
+    }
+    if( dy->cnt<s->ny*s->nx )
+    {
+        ae_vector_set_length(dy, s->ny*s->nx, _state);
+    }
+    if( d2y->cnt<ny*nx*nx )
+    {
+        ae_vector_set_length(d2y, ny*nx*nx, _state);
+    }
+    for(i=0; i<=ny-1; i++)
+    {
+        y->ptr.p_double[i] = s->v.ptr.pp_double[i][nx];
+        for(j=0; j<=nx-1; j++)
+        {
+            y->ptr.p_double[i] = y->ptr.p_double[i]+s->v.ptr.pp_double[i][j]*x->ptr.p_double[j];
+            dy->ptr.p_double[i*nx+j] = s->v.ptr.pp_double[i][j];
+        }
+    }
+    rsetv(ny*nx*nx, 0.0, d2y, _state);
+    if( s->nc==0 )
+    {
+        return;
+    }
+    
+    /*
+     * Rescale X and DY to the internal scaling used by the RBF model (D2Y is zero,
+     * so it does not need rescaling).
+     */
+    for(j=0; j<=nx-1; j++)
+    {
+        buf->x.ptr.p_double[j] = x->ptr.p_double[j]/s->s.ptr.p_double[j];
+    }
+    for(i=0; i<=ny-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            dy->ptr.p_double[i*nx+j] = dy->ptr.p_double[i*nx+j]*s->s.ptr.p_double[j];
+        }
+    }
+    
+    /*
+     * Prepare information necessary for the detection of the nonexistent Hessian
+     */
+    nograd = ae_false;
+    nohess = ae_false;
+    smalldist2 = (rdotv2(nx, &buf->x, _state)+1.0)*ae_sqr(100*ae_machineepsilon, _state);
+    
+    /*
+     * Handle RBF term
+     */
+    ae_assert(s->bftype==1||s->bftype==2, "RBFV3TsHessBuf: unsupported basis function type", _state);
+    ae_assert(s->bftype!=1||ae_fp_greater_eq(s->bfparam,(double)(0)), "RBFV3TsHessBuf: inconsistent BFType/BFParam", _state);
+    maxchunksize = s->evaluator.chunksize;
+    rallocv(maxchunksize, &buf->evalbuf.funcbuf, _state);
+    rallocv(maxchunksize, &buf->evalbuf.wrkbuf, _state);
+    rallocv(maxchunksize, &buf->evalbuf.df1, _state);
+    rallocv(maxchunksize, &buf->evalbuf.df2, _state);
+    rallocm(nx, maxchunksize, &buf->evalbuf.deltabuf, _state);
+    rsetallocv(maxchunksize, 1.0E50, &buf->evalbuf.mindist2, _state);
+    colidx = 0;
+    srcidx = 0;
+    widx = 0;
+    distance0 = 1.0E-50;
+    if( s->bftype==1 )
+    {
+        
+        /*
+         * Kernels that add squared parameter to the squared distance
+         */
+        distance0 = ae_sqr(s->bfparam, _state);
+    }
+    while(colidx<s->nc)
+    {
+        
+        /*
+         * Handle basecase with size at most ChunkSize*ChunkSize
+         */
+        curchunk = ae_minint(maxchunksize, s->nc-colidx, _state);
+        rbfv3_computerowchunk(&s->evaluator, &buf->x, &buf->evalbuf, curchunk, srcidx, distance0, 2, _state);
+        for(i=0; i<=ny-1; i++)
+        {
+            y->ptr.p_double[i] = y->ptr.p_double[i]+rdotvr(curchunk, &buf->evalbuf.funcbuf, &s->wchunked, widx+i, _state);
+            for(k0=0; k0<=nx-1; k0++)
+            {
+                rcopyrv(curchunk, &buf->evalbuf.deltabuf, k0, &buf->evalbuf.wrkbuf, _state);
+                rmergemulv(curchunk, &buf->evalbuf.df1, &buf->evalbuf.wrkbuf, _state);
+                dy->ptr.p_double[i*nx+k0] = dy->ptr.p_double[i*nx+k0]+2*rdotvr(curchunk, &buf->evalbuf.wrkbuf, &s->wchunked, widx+i, _state);
+            }
+            for(k0=0; k0<=nx-1; k0++)
+            {
+                for(k1=0; k1<=nx-1; k1++)
+                {
+                    rcopyv(curchunk, &buf->evalbuf.df2, &buf->evalbuf.wrkbuf, _state);
+                    rmergemulrv(curchunk, &buf->evalbuf.deltabuf, k0, &buf->evalbuf.wrkbuf, _state);
+                    rmergemulrv(curchunk, &buf->evalbuf.deltabuf, k1, &buf->evalbuf.wrkbuf, _state);
+                    d2y->ptr.p_double[i*nx*nx+k0*nx+k1] = d2y->ptr.p_double[i*nx*nx+k0*nx+k1]+4*rdotvr(curchunk, &buf->evalbuf.wrkbuf, &s->wchunked, widx+i, _state);
+                    if( k0==k1 )
+                    {
+                        d2y->ptr.p_double[i*nx*nx+k0*nx+k1] = d2y->ptr.p_double[i*nx*nx+k0*nx+k1]+2*rdotvr(curchunk, &buf->evalbuf.df1, &s->wchunked, widx+i, _state);
+                    }
+                }
+            }
+        }
+        colidx = colidx+curchunk;
+        srcidx = srcidx+nx;
+        widx = widx+ny;
+    }
+    nearnode = ae_false;
+    if( (s->bftype==1&&ae_fp_eq(s->bfparam,(double)(0)))||s->bftype==2 )
+    {
+        
+        /*
+         * The kernel function is nondifferentiable at nodes, check whether we are close to one of the nodes or not
+         */
+        for(i=0; i<=maxchunksize-1; i++)
+        {
+            nearnode = nearnode||buf->evalbuf.mindist2.ptr.p_double[i]<=smalldist2;
+        }
+    }
+    nograd = nearnode&&(s->bftype==1&&ae_fp_eq(s->bfparam,(double)(0)));
+    nohess = nearnode&&((s->bftype==1&&ae_fp_eq(s->bfparam,(double)(0)))||s->bftype==2);
+    if( nograd )
+    {
+        
+        /*
+         * The gradient is undefined at the trial point, flush it to zero
+         */
+        rsetv(ny*nx, 0.0, dy, _state);
+    }
+    if( nohess )
+    {
+        
+        /*
+         * The Hessian is undefined at the trial point, flush it to zero
+         */
+        rsetv(ny*nx*nx, 0.0, d2y, _state);
+    }
+    
+    /*
+     * Rescale derivatives back
+     */
+    for(i=0; i<=ny-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            dy->ptr.p_double[i*nx+j] = dy->ptr.p_double[i*nx+j]/s->s.ptr.p_double[j];
+        }
+    }
+    for(i=0; i<=ny-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            for(k=0; k<=nx-1; k++)
+            {
+                d2y->ptr.p_double[i*nx*nx+j*nx+k] = d2y->ptr.p_double[i*nx*nx+j*nx+k]/(s->s.ptr.p_double[j]*s->s.ptr.p_double[k]);
+            }
+        }
+    }
+}
+
+
+/*************************************************************************
+This function is used to perform gridded calculation  for  2D,  3D  or  4D
+problems. It accepts parameters X0...X3 and counters N0...N3. If RBF model
+has dimensionality less than 4, corresponding arrays should  contain  just
+one element equal to zero, and corresponding N's should be equal to 1.
+
+NOTE: array Y should be preallocated by caller.
+
+  -- ALGLIB --
+     Copyright 12.07.2016 by Bochkanov Sergey
+*************************************************************************/
+void rbfv3gridcalcvx(rbfv3model* s,
+     /* Real    */ ae_vector* x0,
+     ae_int_t n0,
+     /* Real    */ ae_vector* x1,
+     ae_int_t n1,
+     /* Real    */ ae_vector* x2,
+     ae_int_t n2,
+     /* Real    */ ae_vector* x3,
+     ae_int_t n3,
+     /* Boolean */ ae_vector* flagy,
+     ae_bool sparsey,
+     /* Real    */ ae_vector* y,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    rbfv3calcbuffer bufseed;
+    ae_shared_pool bufpool;
+    ae_int_t simdwidth;
+    ae_int_t tilescnt;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&bufseed, 0, sizeof(bufseed));
+    memset(&bufpool, 0, sizeof(bufpool));
+    _rbfv3calcbuffer_init(&bufseed, _state, ae_true);
+    ae_shared_pool_init(&bufpool, _state, ae_true);
+
+    
+    /*
+     * Perform integrity checks
+     */
+    ae_assert(s->nx==2||s->nx==3, "RBFGridCalcVX: integrity check failed", _state);
+    ae_assert(((n0>=1&&n1>=1)&&n2>=1)&&n3>=1, "RBFGridCalcVX: integrity check failed", _state);
+    ae_assert(s->nx>=4||((x3->cnt>=1&&ae_fp_eq(x3->ptr.p_double[0],(double)(0)))&&n3==1), "RBFGridCalcVX: integrity check failed", _state);
+    ae_assert(s->nx>=3||((x2->cnt>=1&&ae_fp_eq(x2->ptr.p_double[0],(double)(0)))&&n2==1), "RBFGridCalcVX: integrity check failed", _state);
+    ae_assert(s->nx>=2||((x1->cnt>=1&&ae_fp_eq(x1->ptr.p_double[0],(double)(0)))&&n1==1), "RBFGridCalcVX: integrity check failed", _state);
+    ae_assert(!sparsey||flagy->cnt>=n0*n1*n2*n3, "RBFGridCalcVX: integrity check failed", _state);
+    
+    /*
+     * Prepare shared pool
+     */
+    rbfv3createcalcbuffer(s, &bufseed, _state);
+    ae_shared_pool_set_seed(&bufpool, &bufseed, sizeof(bufseed), _rbfv3calcbuffer_init, _rbfv3calcbuffer_init_copy, _rbfv3calcbuffer_destroy, _state);
+    
+    /*
+     * Call worker function
+     */
+    simdwidth = 8;
+    tilescnt = idivup(n0, simdwidth, _state)*idivup(n1, simdwidth, _state)*idivup(n2, simdwidth, _state)*idivup(n3, simdwidth, _state);
+    rbfv3_gridcalcrec(s, simdwidth, 0, tilescnt, x0, n0, x1, n1, x2, n2, x3, n3, flagy, sparsey, y, &bufpool, ae_true, _state);
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+This function "unpacks" RBF model by extracting its coefficients.
+
+INPUT PARAMETERS:
+    S       -   RBF model
+
+OUTPUT PARAMETERS:
+    NX      -   dimensionality of argument
+    NY      -   dimensionality of the target function
+    XWR     -   model information, array[NC,NX+NY+NX+2].
+                One row of the array corresponds to one basis function
+                * first NX columns  - coordinates of the center 
+                * next  NY columns  - weights, one per dimension of the 
+                                      function being modeled
+                * next NX columns   - radii, one per dimension
+                * next column       - basis function type:
+                                      * 1  for f=r
+                                      * 2  for f=r^2*ln(r)
+                                      * 10 for multiquadric f=sqrt(r^2+alpha^2)
+                * next column       - basis function parameter:
+                                      * alpha, for basis function type 10
+                                      * ignored (zero) for other basis function types
+                * next column       - point index in the original dataset,
+                                      or -1 for an artificial node created
+                                      by the solver. The algorithm may reorder
+                                      the nodes, drop some nodes or add
+                                      artificial nodes. Thus, one parsing
+                                      this column should expect all these
+                                      kinds of alterations in the dataset.
+    NC      -   number of the centers
+    V       -   polynomial  term , array[NY,NX+1]. One row per one 
+                dimension of the function being modelled. First NX 
+                elements are linear coefficients, V[NX] is equal to the 
+                constant part.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfv3unpack(rbfv3model* s,
+     ae_int_t* nx,
+     ae_int_t* ny,
+     /* Real    */ ae_matrix* xwr,
+     ae_int_t* nc,
+     /* Real    */ ae_matrix* v,
+     ae_state *_state)
+{
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t cwwidth;
+    ae_bool recognized;
+
+    *nx = 0;
+    *ny = 0;
+    ae_matrix_clear(xwr);
+    *nc = 0;
+    ae_matrix_clear(v);
+
+    *nx = s->nx;
+    *ny = s->ny;
+    *nc = s->nc;
+    
+    /*
+     * Fill V
+     */
+    ae_matrix_set_length(v, s->ny, s->nx+1, _state);
+    for(i=0; i<=s->ny-1; i++)
+    {
+        rcopyrr(*nx+1, &s->v, i, v, i, _state);
+    }
+    
+    /*
+     * Fill XWR
+     */
+    if( *nc>0 )
+    {
+        cwwidth = *nx+(*ny);
+        ae_matrix_set_length(xwr, *nc, *nx+(*ny)+(*nx)+3, _state);
+        for(i=0; i<=*nc-1; i++)
+        {
+            
+            /*
+             * Output centers (in the original variable scaling), weights and radii
+             */
+            for(j=0; j<=*nx-1; j++)
+            {
+                xwr->ptr.pp_double[i][j] = s->cw.ptr.p_double[i*cwwidth+j]*s->s.ptr.p_double[j];
+            }
+            for(j=0; j<=*ny-1; j++)
+            {
+                xwr->ptr.pp_double[i][*nx+j] = s->cw.ptr.p_double[i*cwwidth+(*nx)+j];
+            }
+            for(j=0; j<=*nx-1; j++)
+            {
+                xwr->ptr.pp_double[i][*nx+(*ny)+j] = s->s.ptr.p_double[j];
+            }
+            
+            /*
+             * Recognize specific basis function used and perform post-processing
+             */
+            recognized = ae_false;
+            if( s->bftype==1&&ae_fp_eq(s->bfparam,(double)(0)) )
+            {
+                
+                /*
+                 * Biharmonic kernel f=r
+                 *
+                 * Weights are multiplied by -1 because actually it is f=-r (the latter
+                 * is conditionally positive definite basis function, and the former is
+                 * how it is known to most users)
+                 */
+                xwr->ptr.pp_double[i][*nx+(*ny)+(*nx)+0] = (double)(1);
+                xwr->ptr.pp_double[i][*nx+(*ny)+(*nx)+1] = 0.0;
+                for(j=0; j<=*ny-1; j++)
+                {
+                    xwr->ptr.pp_double[i][*nx+j] = -xwr->ptr.pp_double[i][*nx+j];
+                }
+                recognized = ae_true;
+            }
+            if( s->bftype==1&&ae_fp_greater(s->bfparam,(double)(0)) )
+            {
+                
+                /*
+                 * Multiquadric f=sqrt(r^2+alpha^2)
+                 *
+                 * Weights are multiplied by -1 because actually it is f=-sqrt(r^2+alpha^2)
+                 * (the latter is conditionally positive definite basis function, and the
+                 * former is how it is known to most users)
+                 */
+                xwr->ptr.pp_double[i][*nx+(*ny)+(*nx)+0] = (double)(10);
+                xwr->ptr.pp_double[i][*nx+(*ny)+(*nx)+1] = s->bfparam;
+                for(j=0; j<=*ny-1; j++)
+                {
+                    xwr->ptr.pp_double[i][*nx+j] = -xwr->ptr.pp_double[i][*nx+j];
+                }
+                recognized = ae_true;
+            }
+            if( s->bftype==2 )
+            {
+                
+                /*
+                 * Thin plate spline f=r^2*ln(r)
+                 */
+                xwr->ptr.pp_double[i][*nx+(*ny)+(*nx)+0] = (double)(2);
+                xwr->ptr.pp_double[i][*nx+(*ny)+(*nx)+1] = (double)(0);
+                recognized = ae_true;
+            }
+            ae_assert(recognized, "RBFV3: integrity check 5342 failed", _state);
+            
+            /*
+             * Output indexes
+             */
+            xwr->ptr.pp_double[i][*nx+(*ny)+(*nx)+2] = (double)(s->pointindexes.ptr.p_int[i]);
+        }
+    }
+}
+
+
+/*************************************************************************
+Creates fast evaluation structures after initialization of the model
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_createfastevaluator(rbfv3model* model, ae_state *_state)
+{
+    ae_frame _frame_block;
+    ae_int_t offs;
+    ae_int_t ontheflystorage;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t nchunks;
+    ae_int_t srcoffs;
+    ae_int_t dstoffs;
+    ae_int_t curlen;
+    ae_matrix xx;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&xx, 0, sizeof(xx));
+    ae_matrix_init(&xx, 0, 0, DT_REAL, _state, ae_true);
+
+    
+    /*
+     * Setup model matrix structure
+     */
+    ontheflystorage = 1;
+    rallocm(model->nc, model->nx, &xx, _state);
+    offs = 0;
+    for(i=0; i<=model->nc-1; i++)
+    {
+        for(j=0; j<=model->nx-1; j++)
+        {
+            xx.ptr.pp_double[i][j] = model->cw.ptr.p_double[offs+j];
+        }
+        offs = offs+model->nx+model->ny;
+    }
+    rbfv3_modelmatrixinit(&xx, model->nc, model->nx, model->bftype, model->bfparam, ontheflystorage, &model->evaluator, _state);
+    
+    /*
+     * Store model coefficients in the efficient chunked format (chunk size is aligned with that
+     * of the Model.Evaluator).
+     */
+    ae_assert(model->evaluator.chunksize>=1, "RBFV3: integrity check 3535 failed", _state);
+    nchunks = idivup(model->nc, model->evaluator.chunksize, _state);
+    rsetallocm(nchunks*model->ny, model->evaluator.chunksize, 0.0, &model->wchunked, _state);
+    srcoffs = 0;
+    dstoffs = 0;
+    while(srcoffs<model->nc)
+    {
+        curlen = ae_minint(model->evaluator.chunksize, model->nc-srcoffs, _state);
+        for(i=0; i<=curlen-1; i++)
+        {
+            for(j=0; j<=model->ny-1; j++)
+            {
+                model->wchunked.ptr.pp_double[dstoffs+j][i] = model->cw.ptr.p_double[(srcoffs+i)*(model->nx+model->ny)+model->nx+j];
+            }
+        }
+        srcoffs = srcoffs+curlen;
+        dstoffs = dstoffs+model->ny;
+    }
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+Recursive worker function for gridded calculation
+
+  -- ALGLIB --
+     Copyright 01.05.2022 by Bochkanov Sergey
+*************************************************************************/
+static void rbfv3_gridcalcrec(rbfv3model* s,
+     ae_int_t simdwidth,
+     ae_int_t tileidx0,
+     ae_int_t tileidx1,
+     /* Real    */ ae_vector* x0,
+     ae_int_t n0,
+     /* Real    */ ae_vector* x1,
+     ae_int_t n1,
+     /* Real    */ ae_vector* x2,
+     ae_int_t n2,
+     /* Real    */ ae_vector* x3,
+     ae_int_t n3,
+     /* Boolean */ ae_vector* flagy,
+     ae_bool sparsey,
+     /* Real    */ ae_vector* y,
+     ae_shared_pool* calcpool,
+     ae_bool isrootcall,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    ae_task_group *_child_tasks = NULL;
+    ae_bool _smp_enabled = ae_false;
+    ae_int_t ny;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    ae_int_t dstoffs;
+    ae_int_t l;
+    rbfv3calcbuffer *buf;
+    ae_smart_ptr _buf;
+    double problemcost;
+    ae_int_t tileidxm;
+    ae_int_t k0;
+    ae_int_t k1;
+    ae_int_t k2;
+    ae_int_t r0a;
+    ae_int_t r0b;
+    ae_int_t r1a;
+    ae_int_t r1b;
+    ae_int_t r2a;
+    ae_int_t r2b;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&_buf, 0, sizeof(_buf));
+    ae_smart_ptr_init(&_buf, (void**)&buf, _state, ae_true);
+
+    ny = s->ny;
+    
+    /*
+     * Try parallelism if needed; then perform parallel subdivision:
+     * * make all dimensions either (a) multiples of SIMDWidth or (b) less than SIMDWidth by
+     *   splitting small chunks from tails
+     * * after that iteratively subdivide largest side of the grid (one having largest length,
+     *   not largest points count) until we have a chunk with nodes count not greater than SIMDWidth
+     */
+    problemcost = rmul2((double)(tileidx1-tileidx0), (double)(s->nc), _state);
+    problemcost = problemcost*rmul4((double)(ae_minint(n0, simdwidth, _state)), (double)(ae_minint(n1, simdwidth, _state)), (double)(ae_minint(n2, simdwidth, _state)), (double)(ae_minint(n3, simdwidth, _state)), _state);
+    if( isrootcall&&ae_fp_greater_eq(problemcost,smpactivationlevel(_state)) )
+    {
+        if( _trypexec_rbfv3_gridcalcrec(s,simdwidth,tileidx0,tileidx1,x0,n0,x1,n1,x2,n2,x3,n3,flagy,sparsey,y,calcpool,isrootcall, _state) )
+        {
+            ae_sync(_child_tasks, _smp_enabled, ae_true, _state);
+            ae_frame_leave(_state);
+            return;
+        }
+    }
+    if( ae_fp_greater_eq(problemcost,spawnlevel(_state))&&tileidx1-tileidx0>=2 )
+    {
+        ae_set_smp_support(&_child_tasks, &_smp_enabled, ae_true, _state);
+    }
+    if( tileidx1-tileidx0>=2 )
+    {
+        tileidxm = tileidx0+idivup(tileidx1-tileidx0, 2, _state);
+        _spawn_rbfv3_gridcalcrec(s, simdwidth, tileidx0, tileidxm, x0, n0, x1, n1, x2, n2, x3, n3, flagy, sparsey, y, calcpool, ae_false, _child_tasks, _smp_enabled, _state);
+        rbfv3_gridcalcrec(s, simdwidth, tileidxm, tileidx1, x0, n0, x1, n1, x2, n2, x3, n3, flagy, sparsey, y, calcpool, ae_false, _state);
+        ae_sync(_child_tasks, _smp_enabled, ae_true, _state);
+        ae_frame_leave(_state);
+        return;
+    }
+    
+    /*
+     * Handle basecase
+     */
+    k = tileidx0;
+    k0 = k%idivup(n0, simdwidth, _state);
+    k = k/idivup(n0, simdwidth, _state);
+    k1 = k%idivup(n1, simdwidth, _state);
+    k = k/idivup(n1, simdwidth, _state);
+    k2 = k%idivup(n2, simdwidth, _state);
+    k = k/idivup(n2, simdwidth, _state);
+    k = k/idivup(n3, simdwidth, _state);
+    ae_assert(k==0, "RBFV3: integrity check 7350 failed", _state);
+    r0a = k0*simdwidth;
+    r0b = ae_minint(r0a+simdwidth, n0, _state);
+    r1a = k1*simdwidth;
+    r1b = ae_minint(r1a+simdwidth, n1, _state);
+    r2a = k2*simdwidth;
+    r2b = ae_minint(r2a+simdwidth, n2, _state);
+    ae_shared_pool_retrieve(calcpool, &_buf, _state);
+    for(i=r0a; i<=r0b-1; i++)
+    {
+        for(j=r1a; j<=r1b-1; j++)
+        {
+            for(k=r2a; k<=r2b-1; k++)
+            {
+                dstoffs = i+j*n0+k*n0*n1;
+                if( sparsey&&!flagy->ptr.p_bool[dstoffs] )
+                {
+                    for(l=0; l<=ny-1; l++)
+                    {
+                        y->ptr.p_double[l+ny*dstoffs] = (double)(0);
+                    }
+                    continue;
+                }
+                buf->xg.ptr.p_double[0] = x0->ptr.p_double[i];
+                buf->xg.ptr.p_double[1] = x1->ptr.p_double[j];
+                buf->xg.ptr.p_double[2] = x2->ptr.p_double[k];
+                rbfv3tscalcbuf(s, buf, &buf->xg, &buf->yg, _state);
+                for(l=0; l<=ny-1; l++)
+                {
+                    y->ptr.p_double[l+ny*dstoffs] = buf->yg.ptr.p_double[l];
+                }
+            }
+        }
+    }
+    ae_shared_pool_recycle(calcpool, &_buf, _state);
+    ae_sync(_child_tasks, _smp_enabled, ae_true, _state);
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+When called in the multithreaded mode (non-NULL _group), spawns child task.
+Executed serially when called with NULL _group.
+*************************************************************************/
+void _spawn_rbfv3_gridcalcrec(rbfv3model* s,
+    ae_int_t simdwidth,
+    ae_int_t tileidx0,
+    ae_int_t tileidx1,
+    /* Real    */ ae_vector* x0,
+    ae_int_t n0,
+    /* Real    */ ae_vector* x1,
+    ae_int_t n1,
+    /* Real    */ ae_vector* x2,
+    ae_int_t n2,
+    /* Real    */ ae_vector* x3,
+    ae_int_t n3,
+    /* Boolean */ ae_vector* flagy,
+    ae_bool sparsey,
+    /* Real    */ ae_vector* y,
+    ae_shared_pool* calcpool,
+    ae_bool isrootcall,
+    ae_task_group *_group, ae_bool smp_enabled, ae_state *_state)
+{
+    if( _group==NULL || !smp_enabled)
+    {
+        rbfv3_gridcalcrec(s,simdwidth,tileidx0,tileidx1,x0,n0,x1,n1,x2,n2,x3,n3,flagy,sparsey,y,calcpool,isrootcall, _state);
+        return;
+    }
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+    {
+        ae_task_info *_task;
+        _task = ae_create_task(_group, _state);
+        _task->data.func = _task_rbfv3_gridcalcrec;
+        _task->data.flags = _state->flags;
+        _task->data.parameters[0].value.val = s;
+        _task->data.parameters[1].value.ival = simdwidth;
+        _task->data.parameters[2].value.ival = tileidx0;
+        _task->data.parameters[3].value.ival = tileidx1;
+        _task->data.parameters[4].value.val = x0;
+        _task->data.parameters[5].value.ival = n0;
+        _task->data.parameters[6].value.val = x1;
+        _task->data.parameters[7].value.ival = n1;
+        _task->data.parameters[8].value.val = x2;
+        _task->data.parameters[9].value.ival = n2;
+        _task->data.parameters[10].value.val = x3;
+        _task->data.parameters[11].value.ival = n3;
+        _task->data.parameters[12].value.val = flagy;
+        _task->data.parameters[13].value.bval = sparsey;
+        _task->data.parameters[14].value.val = y;
+        _task->data.parameters[15].value.val = calcpool;
+        _task->data.parameters[16].value.bval = isrootcall;
+        ae_push_task(_task, _state, ae_false);
+    }
+#else
+    abort(); /* critical integrity failure */
+#endif
+}
+
+
+/*************************************************************************
+This method is called when worker thread starts working on a non-root task.
+*************************************************************************/
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+void _task_rbfv3_gridcalcrec(ae_task_data *_data, ae_state *_state)
+{
+    rbfv3model* s;
+    ae_int_t simdwidth;
+    ae_int_t tileidx0;
+    ae_int_t tileidx1;
+    ae_vector* x0;
+    ae_int_t n0;
+    ae_vector* x1;
+    ae_int_t n1;
+    ae_vector* x2;
+    ae_int_t n2;
+    ae_vector* x3;
+    ae_int_t n3;
+    ae_vector* flagy;
+    ae_bool sparsey;
+    ae_vector* y;
+    ae_shared_pool* calcpool;
+    ae_bool isrootcall;
+    s = (rbfv3model*)_data->parameters[0].value.val;
+    simdwidth = _data->parameters[1].value.ival;
+    tileidx0 = _data->parameters[2].value.ival;
+    tileidx1 = _data->parameters[3].value.ival;
+    x0 = (ae_vector*)_data->parameters[4].value.val;
+    n0 = _data->parameters[5].value.ival;
+    x1 = (ae_vector*)_data->parameters[6].value.val;
+    n1 = _data->parameters[7].value.ival;
+    x2 = (ae_vector*)_data->parameters[8].value.val;
+    n2 = _data->parameters[9].value.ival;
+    x3 = (ae_vector*)_data->parameters[10].value.val;
+    n3 = _data->parameters[11].value.ival;
+    flagy = (ae_vector*)_data->parameters[12].value.val;
+    sparsey = _data->parameters[13].value.bval;
+    y = (ae_vector*)_data->parameters[14].value.val;
+    calcpool = (ae_shared_pool*)_data->parameters[15].value.val;
+    isrootcall = _data->parameters[16].value.bval;
+   ae_state_set_flags(_state, _data->flags);
+   rbfv3_gridcalcrec(s,simdwidth,tileidx0,tileidx1,x0,n0,x1,n1,x2,n2,x3,n3,flagy,sparsey,y,calcpool,isrootcall, _state);
+}
+#endif
+
+
+/*************************************************************************
+Inserts task as root into worker queue if called from non-worker thread, waits for completion and returns true.
+Returns false if ALGLIB is configured for serial execution or we are already in the worker context.
+*************************************************************************/
+ae_bool _trypexec_rbfv3_gridcalcrec(rbfv3model* s,
+    ae_int_t simdwidth,
+    ae_int_t tileidx0,
+    ae_int_t tileidx1,
+    /* Real    */ ae_vector* x0,
+    ae_int_t n0,
+    /* Real    */ ae_vector* x1,
+    ae_int_t n1,
+    /* Real    */ ae_vector* x2,
+    ae_int_t n2,
+    /* Real    */ ae_vector* x3,
+    ae_int_t n3,
+    /* Boolean */ ae_vector* flagy,
+    ae_bool sparsey,
+    /* Real    */ ae_vector* y,
+    ae_shared_pool* calcpool,
+    ae_bool isrootcall,
+    ae_state *_state)
+{
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+    ae_task_info *_task;
+    const char *_e;
+    if( !ae_can_pexec(_state) )
+        return ae_false;
+    _task = ae_create_task(NULL, _state);
+    _task->data.func = _task_rbfv3_gridcalcrec;
+    _task->data.flags = _state->flags;
+    _task->data.parameters[0].value.val = s;
+    _task->data.parameters[1].value.ival = simdwidth;
+    _task->data.parameters[2].value.ival = tileidx0;
+    _task->data.parameters[3].value.ival = tileidx1;
+    _task->data.parameters[4].value.val = x0;
+    _task->data.parameters[5].value.ival = n0;
+    _task->data.parameters[6].value.val = x1;
+    _task->data.parameters[7].value.ival = n1;
+    _task->data.parameters[8].value.val = x2;
+    _task->data.parameters[9].value.ival = n2;
+    _task->data.parameters[10].value.val = x3;
+    _task->data.parameters[11].value.ival = n3;
+    _task->data.parameters[12].value.val = flagy;
+    _task->data.parameters[13].value.bval = sparsey;
+    _task->data.parameters[14].value.val = y;
+    _task->data.parameters[15].value.val = calcpool;
+    _task->data.parameters[16].value.bval = isrootcall;
+    ae_push_root_task(_task);
+    ae_wait_for_event(&_task->done_event);
+    _e = _task->exception;
+    ae_dispose_task(_task);
+    ae_assert(_e==NULL, _e, _state);
+    return ae_true;
+#else
+    return ae_false;
+#endif
+}
+
+
+/*************************************************************************
+This function fills RBF model by zeros, also cleans up debug fields.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+static void rbfv3_zerofill(rbfv3model* s,
+     ae_int_t nx,
+     ae_int_t ny,
+     ae_state *_state)
+{
+
+
+    s->bftype = 0;
+    s->bfparam = (double)(0);
+    s->nc = 0;
+    rsetallocv(nx, 1.0, &s->s, _state);
+    rsetallocm(ny, nx+1, 0.0, &s->v, _state);
+}
+
+
+/*************************************************************************
+Reallocates calcBuf if necessary, reuses previously allocated space if
+possible.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_allocatecalcbuffer(rbfv3model* s,
+     rbfv3calcbuffer* buf,
+     ae_state *_state)
+{
+
+
+    if( buf->x.cnt<s->nx )
+    {
+        ae_vector_set_length(&buf->x, s->nx, _state);
+    }
+    if( buf->x123.cnt<s->nx )
+    {
+        ae_vector_set_length(&buf->x123, s->nx, _state);
+    }
+    if( buf->y123.cnt<s->ny )
+    {
+        ae_vector_set_length(&buf->y123, s->ny, _state);
+    }
+    if( buf->xg.cnt<4 )
+    {
+        ae_vector_set_length(&buf->xg, 4, _state);
+    }
+    if( buf->yg.cnt<s->ny )
+    {
+        ae_vector_set_length(&buf->yg, s->ny, _state);
+    }
+}
+
+
+/*************************************************************************
+Recursive function that merges points, used by PreprocessDataset()
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_preprocessdatasetrec(/* Real    */ ae_matrix* xbuf,
+     /* Real    */ ae_matrix* ybuf,
+     /* Integer */ ae_vector* initidx,
+     ae_int_t wrk0,
+     ae_int_t wrk1,
+     ae_int_t nx,
+     ae_int_t ny,
+     double mergetol,
+     /* Real    */ ae_vector* tmpboxmin,
+     /* Real    */ ae_vector* tmpboxmax,
+     /* Real    */ ae_matrix* xout,
+     /* Real    */ ae_matrix* yout,
+     /* Integer */ ae_vector* raw2wrkmap,
+     /* Integer */ ae_vector* wrk2rawmap,
+     ae_int_t* nout,
+     ae_state *_state)
+{
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k0;
+    ae_int_t k1;
+    ae_int_t largestdim;
+    double splitval;
+
+
+    if( wrk1<=wrk0 )
+    {
+        return;
+    }
+    
+    /*
+     * Analyze current working set
+     */
+    rallocv(nx, tmpboxmin, _state);
+    rallocv(nx, tmpboxmax, _state);
+    rcopyrv(nx, xbuf, wrk0, tmpboxmin, _state);
+    rcopyrv(nx, xbuf, wrk0, tmpboxmax, _state);
+    for(i=wrk0+1; i<=wrk1-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            tmpboxmin->ptr.p_double[j] = ae_minreal(tmpboxmin->ptr.p_double[j], xbuf->ptr.pp_double[i][j], _state);
+            tmpboxmax->ptr.p_double[j] = ae_maxreal(tmpboxmax->ptr.p_double[j], xbuf->ptr.pp_double[i][j], _state);
+        }
+    }
+    largestdim = 0;
+    for(j=1; j<=nx-1; j++)
+    {
+        if( ae_fp_greater(tmpboxmax->ptr.p_double[j]-tmpboxmin->ptr.p_double[j],tmpboxmax->ptr.p_double[largestdim]-tmpboxmin->ptr.p_double[largestdim]) )
+        {
+            largestdim = j;
+        }
+    }
+    
+    /*
+     * Handle basecase or perform recursive split
+     */
+    if( wrk1-wrk0==1||ae_fp_less(tmpboxmax->ptr.p_double[largestdim]-tmpboxmin->ptr.p_double[largestdim],mergetol*rmax3(rmaxabsv(nx, tmpboxmax, _state), rmaxabsv(nx, tmpboxmin, _state), (double)(1), _state)) )
+    {
+        
+        /*
+         * Merge all points, output
+         */
+        rsetr(nx, 0.0, xout, *nout, _state);
+        rsetr(ny, 0.0, yout, *nout, _state);
+        for(i=wrk0; i<=wrk1-1; i++)
+        {
+            raddrr(nx, (double)1/(double)(wrk1-wrk0), xbuf, i, xout, *nout, _state);
+            raddrr(ny, (double)1/(double)(wrk1-wrk0), ybuf, i, yout, *nout, _state);
+            raw2wrkmap->ptr.p_int[initidx->ptr.p_int[i]] = *nout;
+        }
+        wrk2rawmap->ptr.p_int[*nout] = initidx->ptr.p_int[wrk0];
+        *nout = *nout+1;
+    }
+    else
+    {
+        
+        /*
+         * Perform recursive split along largest axis
+         */
+        splitval = 0.5*(tmpboxmax->ptr.p_double[largestdim]+tmpboxmin->ptr.p_double[largestdim]);
+        k0 = wrk0;
+        k1 = wrk1-1;
+        while(k0<=k1)
+        {
+            if( ae_fp_less_eq(xbuf->ptr.pp_double[k0][largestdim],splitval) )
+            {
+                k0 = k0+1;
+                continue;
+            }
+            if( ae_fp_greater(xbuf->ptr.pp_double[k1][largestdim],splitval) )
+            {
+                k1 = k1-1;
+                continue;
+            }
+            swaprows(xbuf, k0, k1, nx, _state);
+            swaprows(ybuf, k0, k1, ny, _state);
+            swapelementsi(initidx, k0, k1, _state);
+            k0 = k0+1;
+            k1 = k1-1;
+        }
+        ae_assert(k0>wrk0&&k1<wrk1-1, "RBFV3: integrity check 5843 in the recursive subdivision code failed", _state);
+        ae_assert(k0==k1+1, "RBFV3: integrity check 5364 in the recursive subdivision code failed", _state);
+        rbfv3_preprocessdatasetrec(xbuf, ybuf, initidx, wrk0, k0, nx, ny, mergetol, tmpboxmin, tmpboxmax, xout, yout, raw2wrkmap, wrk2rawmap, nout, _state);
+        rbfv3_preprocessdatasetrec(xbuf, ybuf, initidx, k0, wrk1, nx, ny, mergetol, tmpboxmin, tmpboxmax, xout, yout, raw2wrkmap, wrk2rawmap, nout, _state);
+    }
+}
+
+
+/*************************************************************************
+This function preprocesses dataset by:
+* merging non-distinct points
+* centering points
+* applying user scale to X-values
+* performing additional scaling of X-values
+* normalizing Y-values
+
+INPUT PARAMETERS:
+    XRaw        -   array[NRaw,NX], variable values
+    YRaw        -   array[NRaw,NY], target values
+    XScaleRaw   -   array[NX], user scales
+    NRaw,NX,NY  -   metrics; N>0, NX>0, NY>0
+    BFType      -   basis function type
+    BFParamRaw  -   initial value for basis function paramerer (before
+                    applying additional rescaling AddXRescaleAplied)
+    LambdaVRaw  -   smoothing coefficient, as specified by user
+    
+OUTPUT PARAMETERS:
+    XWrk        -   array[NWrk,NX], processed points, XWrk=(XRaw-XShift)/XScaleWrk
+    YWrk        -   array[NWrk,NY], targets, scaled by dividing by YScale
+    PointIndexes-   array[NWrk], point indexes in the original dataset
+    NWrk        -   number of points after preprocessing, 0<NWrk<=NRaw
+    XScaleWrk   -   array[NX], XScaleWrk[]=XScaleRaw[]*AddXRescaleAplied
+    XShift      -   array[NX], centering coefficients
+    YScale      -   common scaling for targets
+    BFParamWrk  -   BFParamRaw/AddXRescaleAplied
+    LambdaVWrk  -   LambdaV after dataset scaling, automatically adjusted for
+                    dataset spread
+    AddXRescaleAplied-additional scaling applied after user scaling
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_preprocessdataset(/* Real    */ ae_matrix* xraw,
+     double mergetol,
+     /* Real    */ ae_matrix* yraw,
+     /* Real    */ ae_vector* xscaleraw,
+     ae_int_t nraw,
+     ae_int_t nx,
+     ae_int_t ny,
+     ae_int_t bftype,
+     double bfparamraw,
+     double lambdavraw,
+     /* Real    */ ae_matrix* xwrk,
+     /* Real    */ ae_matrix* ywrk,
+     /* Integer */ ae_vector* raw2wrkmap,
+     /* Integer */ ae_vector* wrk2rawmap,
+     ae_int_t* nwrk,
+     /* Real    */ ae_vector* xscalewrk,
+     /* Real    */ ae_vector* xshift,
+     double* bfparamwrk,
+     double* lambdavwrk,
+     double* addxrescaleaplied,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    ae_matrix _xraw;
+    ae_matrix _yraw;
+    ae_vector _xscaleraw;
+    ae_int_t i;
+    ae_int_t j;
+    double diag2;
+    double v;
+    ae_matrix xbuf;
+    ae_matrix ybuf;
+    ae_vector tmp0;
+    ae_vector tmp1;
+    ae_vector boxmin;
+    ae_vector boxmax;
+    ae_vector initidx;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&_xraw, 0, sizeof(_xraw));
+    memset(&_yraw, 0, sizeof(_yraw));
+    memset(&_xscaleraw, 0, sizeof(_xscaleraw));
+    memset(&xbuf, 0, sizeof(xbuf));
+    memset(&ybuf, 0, sizeof(ybuf));
+    memset(&tmp0, 0, sizeof(tmp0));
+    memset(&tmp1, 0, sizeof(tmp1));
+    memset(&boxmin, 0, sizeof(boxmin));
+    memset(&boxmax, 0, sizeof(boxmax));
+    memset(&initidx, 0, sizeof(initidx));
+    ae_matrix_init_copy(&_xraw, xraw, _state, ae_true);
+    xraw = &_xraw;
+    ae_matrix_init_copy(&_yraw, yraw, _state, ae_true);
+    yraw = &_yraw;
+    ae_vector_init_copy(&_xscaleraw, xscaleraw, _state, ae_true);
+    xscaleraw = &_xscaleraw;
+    ae_matrix_clear(xwrk);
+    ae_matrix_clear(ywrk);
+    ae_vector_clear(raw2wrkmap);
+    ae_vector_clear(wrk2rawmap);
+    *nwrk = 0;
+    ae_vector_clear(xscalewrk);
+    ae_vector_clear(xshift);
+    *bfparamwrk = 0;
+    *lambdavwrk = 0;
+    *addxrescaleaplied = 0;
+    ae_matrix_init(&xbuf, 0, 0, DT_REAL, _state, ae_true);
+    ae_matrix_init(&ybuf, 0, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&tmp0, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&tmp1, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&boxmin, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&boxmax, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&initidx, 0, DT_INT, _state, ae_true);
+
+    ae_assert(nraw>=1, "RBFV3: integrity check 7295 failed", _state);
+    
+    /*
+     * Scale dataset:
+     * * first, scale it according to user-supplied scale
+     * * second, analyze original dataset and rescale it one more time (same scaling across
+     *   all dimensions) so it has zero mean and unit deviation
+     * As a result, user-supplied scaling handles dimensionality issues and our additional
+     * scaling normalizes data.
+     *
+     * After this block we have NRaw-sized dataset in XWrk/YWrk
+     */
+    rcopyallocv(nx, xscaleraw, xscalewrk, _state);
+    rsetallocv(nx, 0.0, xshift, _state);
+    rallocm(nraw, nx, xwrk, _state);
+    for(i=0; i<=nraw-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            xwrk->ptr.pp_double[i][j] = xraw->ptr.pp_double[i][j]/xscalewrk->ptr.p_double[j];
+            xshift->ptr.p_double[j] = xshift->ptr.p_double[j]+xwrk->ptr.pp_double[i][j];
+        }
+    }
+    rmulv(nx, (double)1/(double)nraw, xshift, _state);
+    v = (double)(0);
+    for(i=0; i<=nraw-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            v = v+(xwrk->ptr.pp_double[i][j]-xshift->ptr.p_double[j])*(xwrk->ptr.pp_double[i][j]-xshift->ptr.p_double[j]);
+        }
+    }
+    *addxrescaleaplied = ae_sqrt((v+ae_sqrt(ae_machineepsilon, _state))/(nraw*nx), _state);
+    *bfparamwrk = bfparamraw;
+    if( bftype==1 )
+    {
+        
+        /*
+         * Basis function parameter needs rescaling
+         */
+        if( ae_fp_less(bfparamraw,(double)(0)) )
+        {
+            *bfparamwrk = rbfv3_autodetectscaleparameter(xwrk, nraw, nx, _state)*(-bfparamraw)/(*addxrescaleaplied);
+        }
+        else
+        {
+            *bfparamwrk = bfparamraw/(*addxrescaleaplied);
+        }
+    }
+    else
+    {
+        if( bftype==2 )
+        {
+            
+            /*
+             * Thin plate splines need special scaling; no params to rescale
+             */
+            *addxrescaleaplied = rbfv3_polyharmonic2scale*(*addxrescaleaplied);
+        }
+        else
+        {
+            ae_assert(ae_false, "RBFV3: integrity check 0632 failed", _state);
+        }
+    }
+    rmulv(nx, *addxrescaleaplied, xscalewrk, _state);
+    for(i=0; i<=nraw-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            xwrk->ptr.pp_double[i][j] = (xraw->ptr.pp_double[i][j]-xshift->ptr.p_double[j])/xscalewrk->ptr.p_double[j];
+        }
+    }
+    rcopyallocm(nraw, ny, yraw, ywrk, _state);
+    
+    /*
+     * Merge nondistinct points
+     */
+    iallocv(nraw, &initidx, _state);
+    for(i=0; i<=nraw-1; i++)
+    {
+        initidx.ptr.p_int[i] = i;
+    }
+    rcopyallocm(nraw, nx, xwrk, &xbuf, _state);
+    rcopyallocm(nraw, ny, ywrk, &ybuf, _state);
+    iallocv(nraw, raw2wrkmap, _state);
+    iallocv(nraw, wrk2rawmap, _state);
+    *nwrk = 0;
+    rbfv3_preprocessdatasetrec(&xbuf, &ybuf, &initidx, 0, nraw, nx, ny, mergetol, &tmp0, &tmp1, xwrk, ywrk, raw2wrkmap, wrk2rawmap, nwrk, _state);
+    
+    /*
+     * Compute LambdaV:
+     * * compute bounding box
+     * * compute DIAG2 = squared diagonal of the box
+     * * set LambdaVWrk = LambdaVRaw times upper bound of the basis function value
+     */
+    rallocv(nx, &boxmin, _state);
+    rallocv(nx, &boxmax, _state);
+    rcopyrv(nx, xwrk, 0, &boxmin, _state);
+    rcopyrv(nx, xwrk, 0, &boxmax, _state);
+    for(i=1; i<=*nwrk-1; i++)
+    {
+        rmergeminrv(nx, xwrk, i, &boxmin, _state);
+        rmergemaxrv(nx, xwrk, i, &boxmax, _state);
+    }
+    diag2 = (double)(0);
+    for(i=0; i<=nx-1; i++)
+    {
+        diag2 = diag2+ae_sqr(boxmax.ptr.p_double[i]-boxmin.ptr.p_double[i], _state);
+    }
+    diag2 = ae_maxreal(diag2, (double)(1), _state);
+    if( bftype==1 )
+    {
+        *lambdavwrk = lambdavraw*ae_sqrt(diag2+*bfparamwrk*(*bfparamwrk), _state);
+    }
+    else
+    {
+        if( bftype==2 )
+        {
+            *lambdavwrk = lambdavraw*diag2*ae_maxreal(ae_fabs(0.5*ae_log(diag2, _state), _state), 1.0, _state);
+        }
+        else
+        {
+            *lambdavwrk = lambdavraw;
+            ae_assert(ae_false, "RBFV3: integrity check 7232 failed", _state);
+        }
+    }
+    *lambdavwrk = *lambdavwrk/ae_sqr(*addxrescaleaplied, _state);
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+This function selects NSpec global nodes for approximate cardinal basis functions.
+
+This function has O(N*NSpec) running time and O(N) memory requirements.
+
+Each approximate cardinal basis function is a combination of several local
+nodes (ones nearby to the center) and several global nodes (ones scattered
+over entire dataset span).
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_selectglobalnodes(/* Real    */ ae_matrix* xx,
+     ae_int_t n,
+     ae_int_t nx,
+     /* Integer */ ae_vector* existingnodes,
+     ae_int_t nexisting,
+     ae_int_t nspec,
+     /* Integer */ ae_vector* nodes,
+     ae_int_t* nchosen,
+     double* maxdist,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    ae_vector d2;
+    ae_vector x;
+    ae_vector busy;
+    double v;
+    double vv;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&d2, 0, sizeof(d2));
+    memset(&x, 0, sizeof(x));
+    memset(&busy, 0, sizeof(busy));
+    *nchosen = 0;
+    *maxdist = 0;
+    ae_vector_init(&d2, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&x, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&busy, 0, DT_BOOL, _state, ae_true);
+
+    ae_assert(n>=1, "RBFV3: integrity check 6429 failed", _state);
+    ae_assert(nexisting>=0, "RBFV3: integrity check 6412 failed", _state);
+    ae_assert(nspec>=1, "RBFV3: integrity check 6430 failed", _state);
+    nspec = ae_minint(nspec, n, _state);
+    rsetallocv(n, 1.0E50, &d2, _state);
+    rsetallocv(nx, 0.0, &x, _state);
+    bsetallocv(n, ae_false, &busy, _state);
+    if( nexisting==0 )
+    {
+        
+        /*
+         * No initial grid is provided, start distance evaluation from the data center
+         */
+        for(i=0; i<=n-1; i++)
+        {
+            rcopyrv(nx, xx, i, &x, _state);
+        }
+        rmulv(nx, (double)1/(double)n, &x, _state);
+    }
+    else
+    {
+        
+        /*
+         *
+         */
+        ae_assert(ae_false, "SelectGlobalNodes: NExisting<>0", _state);
+    }
+    iallocv(nspec, nodes, _state);
+    *nchosen = 0;
+    *maxdist = ae_maxrealnumber;
+    while(*nchosen<nspec)
+    {
+        
+        /*
+         * Update distances using last added point stored in X.
+         */
+        for(j=0; j<=n-1; j++)
+        {
+            v = (double)(0);
+            for(k=0; k<=nx-1; k++)
+            {
+                vv = x.ptr.p_double[k]-xx->ptr.pp_double[j][k];
+                v = v+vv*vv;
+            }
+            d2.ptr.p_double[j] = ae_minreal(d2.ptr.p_double[j], v, _state);
+        }
+        
+        /*
+         * Select point with largest distance, add
+         */
+        k = 0;
+        for(j=0; j<=n-1; j++)
+        {
+            if( ae_fp_greater(d2.ptr.p_double[j],d2.ptr.p_double[k])&&!busy.ptr.p_bool[j] )
+            {
+                k = j;
+            }
+        }
+        if( busy.ptr.p_bool[k] )
+        {
+            break;
+        }
+        *maxdist = ae_minreal(*maxdist, d2.ptr.p_double[k], _state);
+        nodes->ptr.p_int[*nchosen] = k;
+        busy.ptr.p_bool[k] = ae_true;
+        rcopyrv(nx, xx, k, &x, _state);
+        *nchosen = *nchosen+1;
+    }
+    *maxdist = ae_sqrt(*maxdist, _state);
+    ae_assert(*nchosen>=1||nexisting>0, "RBFV3: integrity check 6431 failed", _state);
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+This function builds simplified tagged KD-tree: it assigns a tag (index in
+the dataset) to each point, then drops most points (leaving  approximately
+1/ReduceFactor of the entire dataset)  trying to  spread  residual  points
+uniformly, and then constructs KD-tree.
+
+It ensures that at least min(N,MinSize) points is retained.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_buildsimplifiedkdtree(/* Real    */ ae_matrix* xx,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_int_t reducefactor,
+     ae_int_t minsize,
+     kdtree* kdt,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    ae_int_t ns;
+    ae_matrix xs;
+    ae_vector idx;
+    hqrndstate rs;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&xs, 0, sizeof(xs));
+    memset(&idx, 0, sizeof(idx));
+    memset(&rs, 0, sizeof(rs));
+    _kdtree_clear(kdt);
+    ae_matrix_init(&xs, 0, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&idx, 0, DT_INT, _state, ae_true);
+    _hqrndstate_init(&rs, _state, ae_true);
+
+    ae_assert(n>=1, "BuildSimplifiedKDTree: N<1", _state);
+    ae_assert(reducefactor>=1, "BuildSimplifiedKDTree: ReduceFactor<1", _state);
+    ae_assert(minsize>=0, "BuildSimplifiedKDTree: ReduceFactor<1", _state);
+    hqrndseed(7674, 45775, &rs, _state);
+    ns = imax3(ae_round((double)n/(double)reducefactor, _state), minsize, 1, _state);
+    ns = ae_minint(ns, n, _state);
+    iallocv(n, &idx, _state);
+    rallocm(ns, nx, &xs, _state);
+    for(i=0; i<=n-1; i++)
+    {
+        idx.ptr.p_int[i] = i;
+    }
+    for(i=0; i<=ns-1; i++)
+    {
+        j = i+hqrnduniformi(&rs, n-i, _state);
+        k = idx.ptr.p_int[i];
+        idx.ptr.p_int[i] = idx.ptr.p_int[j];
+        idx.ptr.p_int[j] = k;
+        rcopyrr(nx, xx, idx.ptr.p_int[i], &xs, i, _state);
+    }
+    kdtreebuildtagged(&xs, &idx, ns, nx, 0, 2, kdt, _state);
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+Compute design matrices for the target-scatter preconditioner
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_computetargetscatterdesignmatrices(/* Real    */ ae_matrix* xx,
+     ae_int_t ntotal,
+     ae_int_t nx,
+     ae_int_t functype,
+     double funcparam,
+     /* Integer */ ae_vector* workingnodes,
+     ae_int_t nwrk,
+     /* Integer */ ae_vector* scatternodes,
+     ae_int_t nscatter,
+     /* Real    */ ae_matrix* atwrk,
+     /* Real    */ ae_matrix* atsctr,
+     ae_state *_state)
+{
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    double v;
+    double vv;
+    ae_int_t ni;
+    ae_int_t nj;
+    double alpha2;
+
+
+    
+    /*
+     * Compute working set and scatter set design matrices ATWrk and ATSctr
+     *
+     * ATWrk  is a (NWrk+NX+1)*NWrk matrix whose entries a[i,j] store:
+     * * for I<NWrk             BasisFunc(X[wrk[i]]-X[wrj[j]])
+     * * for NWrk<=I<NWrk+NX    X[wrk[j]], coordinate #(i-NWrk)
+     * * for I=NWrk+NX          1.0
+     *
+     * ATSctr is a (NWrk+NX+1)*NScatter matrix whose entries a[i,j] store:
+     * * for I<NWrk             BasisFunc(X[wrk[i]]-X[scatter[j]])
+     * * for NWrk<=I<NWrk+NX    X[scatter[j]], coordinate #(i-NWrk)
+     * * for I=NWrk+NX          1.0
+     */
+    ae_assert((functype==1||functype==2)||functype==3, "ACBF: unexpected basis function type", _state);
+    alpha2 = funcparam*funcparam;
+    rallocm(nwrk+nx+1, nwrk, atwrk, _state);
+    for(i=0; i<=nwrk-1; i++)
+    {
+        ni = workingnodes->ptr.p_int[i];
+        for(j=i; j<=nwrk-1; j++)
+        {
+            nj = workingnodes->ptr.p_int[j];
+            v = (double)(0);
+            for(k=0; k<=nx-1; k++)
+            {
+                vv = xx->ptr.pp_double[ni][k]-xx->ptr.pp_double[nj][k];
+                v = v+vv*vv;
+            }
+            if( functype==1 )
+            {
+                v = -ae_sqrt(v+alpha2, _state);
+            }
+            if( functype==2 )
+            {
+                if( v!=0 )
+                {
+                    v = v*0.5*ae_log(v, _state);
+                }
+                else
+                {
+                    v = (double)(0);
+                }
+            }
+            if( functype==3 )
+            {
+                v = v*ae_sqrt(v, _state);
+            }
+            atwrk->ptr.pp_double[i][j] = v;
+            atwrk->ptr.pp_double[j][i] = v;
+        }
+    }
+    for(j=0; j<=nwrk-1; j++)
+    {
+        nj = workingnodes->ptr.p_int[j];
+        for(i=0; i<=nx-1; i++)
+        {
+            atwrk->ptr.pp_double[nwrk+i][j] = xx->ptr.pp_double[nj][i];
+        }
+    }
+    for(j=0; j<=nwrk-1; j++)
+    {
+        atwrk->ptr.pp_double[nwrk+nx][j] = 1.0;
+    }
+    if( nscatter>0 )
+    {
+        
+        /*
+         * We have scattered points too
+         */
+        rallocm(nwrk+nx+1, nscatter, atsctr, _state);
+        for(i=0; i<=nwrk-1; i++)
+        {
+            ni = workingnodes->ptr.p_int[i];
+            for(j=0; j<=nscatter-1; j++)
+            {
+                nj = scatternodes->ptr.p_int[j];
+                v = (double)(0);
+                for(k=0; k<=nx-1; k++)
+                {
+                    vv = xx->ptr.pp_double[ni][k]-xx->ptr.pp_double[nj][k];
+                    v = v+vv*vv;
+                }
+                if( functype==1 )
+                {
+                    v = -ae_sqrt(v+alpha2, _state);
+                }
+                if( functype==2 )
+                {
+                    if( v!=0 )
+                    {
+                        v = v*0.5*ae_log(v, _state);
+                    }
+                    else
+                    {
+                        v = (double)(0);
+                    }
+                }
+                if( functype==3 )
+                {
+                    v = v*ae_sqrt(v, _state);
+                }
+                atsctr->ptr.pp_double[i][j] = v;
+            }
+        }
+        for(j=0; j<=nscatter-1; j++)
+        {
+            nj = scatternodes->ptr.p_int[j];
+            for(i=0; i<=nx-1; i++)
+            {
+                atsctr->ptr.pp_double[nwrk+i][j] = xx->ptr.pp_double[nj][i];
+            }
+        }
+        for(j=0; j<=nscatter-1; j++)
+        {
+            atsctr->ptr.pp_double[nwrk+nx][j] = 1.0;
+        }
+    }
+}
+
+
+/*************************************************************************
+ACBF preconditioner generation basecase.
+
+PARAMETERS:
+    Builder             -   ACBF builder object
+    Wrk0, Wrk1          -   elements [Wrk0...Wrk1-1] of Builder.WrkIdx[]
+                            array store row indexes of XX that are processed.
+    
+OUTPUT:
+    Builder.OutputPool is updated with new chunks
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_computeacbfpreconditionerbasecase(acbfbuilder* builder,
+     acbfbuffer* buf,
+     ae_int_t wrk0,
+     ae_int_t wrk1,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    ae_int_t widx;
+    ae_int_t targetidx;
+    ae_int_t nx;
+    ae_int_t nglobal;
+    ae_int_t nlocal;
+    ae_int_t ncorrection;
+    ae_int_t ncenters;
+    ae_int_t nchosen;
+    ae_int_t ncoeff;
+    ae_int_t batchsize;
+    ae_int_t nk;
+    ae_int_t nq;
+    ae_vector x;
+    ae_vector batchcenter;
+    ae_vector idummy;
+    double localrad;
+    double currentrad;
+    double reg;
+    double v;
+    double vv;
+    double mx;
+    double maxdist2;
+    ae_int_t ortbasissize;
+    ae_vector ortbasismap;
+    acbfchunk *precchunk;
+    ae_smart_ptr _precchunk;
+    ae_int_t expansionscount;
+    ae_matrix dbgb;
+    double dbgerrnodes;
+    double dbgerrort;
+    double dbgcondq;
+    double dbgmaxc;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&x, 0, sizeof(x));
+    memset(&batchcenter, 0, sizeof(batchcenter));
+    memset(&idummy, 0, sizeof(idummy));
+    memset(&ortbasismap, 0, sizeof(ortbasismap));
+    memset(&_precchunk, 0, sizeof(_precchunk));
+    memset(&dbgb, 0, sizeof(dbgb));
+    ae_vector_init(&x, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&batchcenter, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&idummy, 0, DT_INT, _state, ae_true);
+    ae_vector_init(&ortbasismap, 0, DT_INT, _state, ae_true);
+    ae_smart_ptr_init(&_precchunk, (void**)&precchunk, _state, ae_true);
+    ae_matrix_init(&dbgb, 0, 0, DT_REAL, _state, ae_true);
+
+    if( wrk1<=wrk0 )
+    {
+        ae_frame_leave(_state);
+        return;
+    }
+    nx = builder->nx;
+    nglobal = builder->nglobal;
+    nlocal = builder->nlocal;
+    ncorrection = builder->ncorrection;
+    reg = ae_sqrt(ae_machineepsilon, _state);
+    rallocv(nx, &x, _state);
+    expansionscount = 0;
+    
+    /*
+     * First, select a batch of central points and compute batch center
+     */
+    batchsize = wrk1-wrk0;
+    iallocv(batchsize, &buf->currentnodes, _state);
+    rsetallocv(nx, 0.0, &batchcenter, _state);
+    for(i=0; i<=batchsize-1; i++)
+    {
+        targetidx = builder->wrkidx.ptr.p_int[wrk0+i];
+        buf->currentnodes.ptr.p_int[i] = targetidx;
+        buf->bflags.ptr.p_bool[targetidx] = ae_true;
+        raddrv(nx, (double)1/(double)batchsize, &builder->xx, builder->wrkidx.ptr.p_int[wrk0+i], &batchcenter, _state);
+    }
+    ncenters = batchsize;
+    
+    /*
+     * Then, add a hull of nearest neighbors and compute its radius
+     */
+    localrad = (double)(0);
+    for(widx=0; widx<=batchsize-1; widx++)
+    {
+        
+        /*
+         * Select immediate neighbors
+         */
+        rcopyrv(nx, &builder->xx, builder->wrkidx.ptr.p_int[wrk0+widx], &x, _state);
+        nq = kdtreetsqueryknn(&builder->kdt, &buf->kdtbuf, &x, nlocal, ae_true, _state);
+        kdtreetsqueryresultstags(&builder->kdt, &buf->kdtbuf, &buf->neighbors, _state);
+        kdtreetsqueryresultsdistances(&builder->kdt, &buf->kdtbuf, &buf->d, _state);
+        for(k=0; k<=nq-1; k++)
+        {
+            nk = buf->neighbors.ptr.p_int[k];
+            if( !buf->bflags.ptr.p_bool[nk] )
+            {
+                buf->bflags.ptr.p_bool[nk] = ae_true;
+                igrowv(ncenters+1, &buf->currentnodes, _state);
+                buf->currentnodes.ptr.p_int[ncenters] = nk;
+                ncenters = ncenters+1;
+                v = (double)(0);
+                for(j=0; j<=nx-1; j++)
+                {
+                    v = v+(builder->xx.ptr.pp_double[nk][j]-batchcenter.ptr.p_double[j])*(builder->xx.ptr.pp_double[nk][j]-batchcenter.ptr.p_double[j]);
+                }
+                localrad = ae_maxreal(localrad, v, _state);
+            }
+        }
+    }
+    localrad = ae_sqrt(localrad, _state);
+    currentrad = localrad;
+    
+    /*
+     * Add global grid
+     */
+    if( nglobal>0 )
+    {
+        for(k=0; k<=nglobal-1; k++)
+        {
+            nk = builder->globalgrid.ptr.p_int[k];
+            if( !buf->bflags.ptr.p_bool[nk] )
+            {
+                buf->bflags.ptr.p_bool[nk] = ae_true;
+                igrowv(ncenters+1, &buf->currentnodes, _state);
+                buf->currentnodes.ptr.p_int[ncenters] = nk;
+                ncenters = ncenters+1;
+            }
+        }
+    }
+    
+    /*
+     * Add local correction grid: select more distant neighbors
+     */
+    while(ae_fp_greater(currentrad,(double)(0))&&ae_fp_less(currentrad,builder->roughdatasetdiameter))
+    {
+        
+        /*
+         * Select neighbors within CurrentRad*Builder.CorrectorGrowth
+         */
+        if( expansionscount==0 )
+        {
+            
+            /*
+             * First expansion, use simplified kd-tree #1
+             */
+            nq = kdtreetsqueryrnn(&builder->kdt1, &buf->kdt1buf, &batchcenter, currentrad*builder->correctorgrowth, ae_true, _state);
+            kdtreetsqueryresultstags(&builder->kdt1, &buf->kdt1buf, &buf->neighbors, _state);
+        }
+        else
+        {
+            
+            /*
+             * Subsequent expansions, use simplified kd-tree #2
+             */
+            nq = kdtreetsqueryrnn(&builder->kdt2, &buf->kdt2buf, &batchcenter, currentrad*builder->correctorgrowth, ae_true, _state);
+            kdtreetsqueryresultstags(&builder->kdt2, &buf->kdt2buf, &buf->neighbors, _state);
+        }
+        
+        /*
+         * Compute a grid of well-separated nodes using neighbors
+         */
+        rallocm(nq, nx, &buf->xq, _state);
+        for(k=0; k<=nq-1; k++)
+        {
+            nk = buf->neighbors.ptr.p_int[k];
+            for(j=0; j<=nx-1; j++)
+            {
+                buf->xq.ptr.pp_double[k][j] = builder->xx.ptr.pp_double[nk][j];
+            }
+        }
+        rbfv3_selectglobalnodes(&buf->xq, nq, nx, &idummy, 0, ncorrection, &buf->chosenneighbors, &nchosen, &maxdist2, _state);
+        
+        /*
+         * Select neighbrs that are NOT within CurrentRad from the batch center
+         * and that are NOT already chosen.
+         */
+        for(k=0; k<=nchosen-1; k++)
+        {
+            nk = buf->neighbors.ptr.p_int[buf->chosenneighbors.ptr.p_int[k]];
+            v = (double)(0);
+            for(j=0; j<=nx-1; j++)
+            {
+                v = v+ae_sqr(builder->xx.ptr.pp_double[nk][j]-batchcenter.ptr.p_double[j], _state);
+            }
+            v = ae_sqrt(v, _state);
+            if( !buf->bflags.ptr.p_bool[nk]&&ae_fp_greater(v,currentrad) )
+            {
+                buf->bflags.ptr.p_bool[nk] = ae_true;
+                igrowv(ncenters+1, &buf->currentnodes, _state);
+                buf->currentnodes.ptr.p_int[ncenters] = nk;
+                ncenters = ncenters+1;
+            }
+        }
+        
+        /*
+         * Update radius and debug counters
+         */
+        currentrad = currentrad*builder->correctorgrowth;
+        inc(&expansionscount, _state);
+    }
+    
+    /*
+     * Clean up bFlags[]
+     */
+    for(k=0; k<=ncenters-1; k++)
+    {
+        buf->bflags.ptr.p_bool[buf->currentnodes.ptr.p_int[k]] = ae_false;
+    }
+    
+    /*
+     * Compute working set and scatter set design matrices ATWrk and ATSctr
+     *
+     * ATWrk  is a (NWrk+NX+1)*NWrk matrix whose entries a[i,j] store:
+     * * for I<NWrk             BasisFunc(X[wrk[i]]-X[wrj[j]])
+     * * for NWrk<=I<NWrk+NX    X[wrk[j]], coordinate #(i-NWrk)
+     * * for I=NWrk+NX          1.0
+     *
+     * ATSctr is a (NWrk+NX+1)*NScatter matrix whose entries a[i,j] store:
+     * * for I<NWrk             BasisFunc(X[wrk[i]]-X[scatter[j]])
+     * * for NWrk<=I<NWrk+NX    X[scatter[j]], coordinate #(i-NWrk)
+     * * for I=NWrk+NX          1.0
+     */
+    rbfv3_computetargetscatterdesignmatrices(&builder->xx, builder->ntotal, nx, builder->functype, builder->funcparam, &buf->currentnodes, ncenters, &buf->currentnodes, 0, &buf->atwrk, &buf->atwrk, _state);
+    
+    /*
+     * Prepare and solve linear system, coefficients are stored in rows of Buf.B
+     *
+     * Depending on whether the basis is conditionally positive definite (given current polynomial term type),
+     * we either:
+     * * use generic QR solver to solve the linear system (when the basis is not CPD)
+     * * use specialized CPD solver that is several times faster and is more accurate
+     */
+    if( builder->aterm!=1||!rbfv3_iscpdfunction(builder->functype, builder->aterm, _state) )
+    {
+        ae_assert(ae_fp_greater_eq(builder->lambdav,(double)(0)), "RBF3: integrity check 8363 failed", _state);
+        ae_assert((builder->aterm==1||builder->aterm==2)||builder->aterm==3, "RBF3: integrity check 8364 failed", _state);
+        
+        /*
+         * Basis function has no conditional positive definiteness guarantees (given the linear term type).
+         *
+         * Solve using QR decomposition.
+         */
+        ncoeff = ncenters+nx+1;
+        rsetallocm(ncoeff, ncoeff+batchsize, 0.0, &buf->q, _state);
+        for(i=0; i<=ncenters-1; i++)
+        {
+            rcopyrr(ncenters, &buf->atwrk, i, &buf->q, i, _state);
+            buf->q.ptr.pp_double[i][i] = buf->q.ptr.pp_double[i][i]+builder->lambdav;
+        }
+        if( builder->aterm==1 )
+        {
+            
+            /*
+             * Linear term is used
+             */
+            for(i=0; i<=nx; i++)
+            {
+                for(j=0; j<=ncenters-1; j++)
+                {
+                    buf->q.ptr.pp_double[ncenters+i][j] = buf->atwrk.ptr.pp_double[ncenters+i][j];
+                    buf->q.ptr.pp_double[j][ncenters+i] = buf->atwrk.ptr.pp_double[ncenters+i][j];
+                }
+            }
+        }
+        if( builder->aterm==2 )
+        {
+            
+            /*
+             * Constant term is used
+             */
+            for(i=0; i<=nx-1; i++)
+            {
+                buf->q.ptr.pp_double[ncenters+i][ncenters+i] = 1.0;
+            }
+            for(j=0; j<=ncenters-1; j++)
+            {
+                buf->q.ptr.pp_double[ncenters+nx][j] = 1.0;
+                buf->q.ptr.pp_double[j][ncenters+nx] = 1.0;
+            }
+        }
+        if( builder->aterm==3 )
+        {
+            
+            /*
+             * Zero term is used
+             */
+            for(i=0; i<=nx; i++)
+            {
+                buf->q.ptr.pp_double[ncenters+i][ncenters+i] = 1.0;
+            }
+        }
+        for(i=0; i<=batchsize-1; i++)
+        {
+            buf->q.ptr.pp_double[i][ncoeff+i] = 1.0;
+        }
+        mx = 1.0;
+        for(i=0; i<=ncoeff-1; i++)
+        {
+            for(j=i; j<=ncoeff-1; j++)
+            {
+                mx = ae_maxreal(mx, ae_fabs(buf->q.ptr.pp_double[i][j], _state), _state);
+            }
+        }
+        for(j=0; j<=ncoeff-1; j++)
+        {
+            buf->q.ptr.pp_double[j][j] = buf->q.ptr.pp_double[j][j]+reg*mx*possign(buf->q.ptr.pp_double[j][j], _state);
+        }
+        rmatrixqr(&buf->q, ncoeff, ncoeff+batchsize, &buf->tau, _state);
+        rallocm(batchsize, ncoeff, &buf->b, _state);
+        rmatrixtranspose(ncoeff, batchsize, &buf->q, 0, ncoeff, &buf->b, 0, 0, _state);
+        rmatrixrighttrsm(batchsize, ncoeff, &buf->q, 0, 0, ae_true, ae_false, 1, &buf->b, 0, 0, _state);
+    }
+    else
+    {
+        ae_assert(ae_fp_greater_eq(builder->lambdav,(double)(0)), "RBF3: integrity check 8368 failed", _state);
+        ae_assert(builder->aterm==1, "RBF3: integrity check 7365 failed", _state);
+        ncoeff = ncenters+nx+1;
+        
+        /*
+         * First, compute orthogonal basis of space spanned by polynomials of degree 1
+         */
+        rallocm(ncenters, ncenters, &buf->r, _state);
+        rallocm(nx+1, ncenters, &buf->q1, _state);
+        iallocv(nx+1, &ortbasismap, _state);
+        rsetr(ncenters, 1/ae_sqrt((double)(ncenters), _state), &buf->q1, 0, _state);
+        buf->r.ptr.pp_double[0][0] = ae_sqrt((double)(ncenters), _state);
+        ortbasismap.ptr.p_int[0] = nx;
+        ortbasissize = 1;
+        rallocv(ncenters, &buf->z, _state);
+        for(k=0; k<=nx-1; k++)
+        {
+            for(j=0; j<=ncenters-1; j++)
+            {
+                buf->z.ptr.p_double[j] = buf->atwrk.ptr.pp_double[ncenters+k][j];
+            }
+            v = ae_sqrt(rdotv2(ncenters, &buf->z, _state), _state);
+            rowwisegramschmidt(&buf->q1, ortbasissize, ncenters, &buf->z, &buf->y, ae_true, _state);
+            vv = ae_sqrt(rdotv2(ncenters, &buf->z, _state), _state);
+            if( ae_fp_greater(vv,ae_sqrt(ae_machineepsilon, _state)*(v+1)) )
+            {
+                rcopymulvr(ncenters, 1/vv, &buf->z, &buf->q1, ortbasissize, _state);
+                rcopyvc(ortbasissize, &buf->y, &buf->r, ortbasissize, _state);
+                buf->r.ptr.pp_double[ortbasissize][ortbasissize] = vv;
+                ortbasismap.ptr.p_int[ortbasissize] = k;
+                ortbasissize = ortbasissize+1;
+            }
+        }
+        
+        /*
+         * Second, compute system matrix Q and target values for cardinal basis functions B.
+         *
+         * The Q is conditionally positive definite, i.e. x'*Q*x>0 for any x satisfying orthogonality conditions
+         * (orthogonal with respect to basis stored in Q1).
+         */
+        rsetallocm(ncenters, ncenters, 0.0, &buf->q, _state);
+        for(i=0; i<=ncenters-1; i++)
+        {
+            rcopyrr(ncenters, &buf->atwrk, i, &buf->q, i, _state);
+        }
+        rsetallocm(batchsize, ncoeff, 0.0, &buf->b, _state);
+        for(i=0; i<=batchsize-1; i++)
+        {
+            buf->b.ptr.pp_double[i][i] = 1.0;
+        }
+        for(i=0; i<=ncenters-1; i++)
+        {
+            buf->q.ptr.pp_double[i][i] = buf->q.ptr.pp_double[i][i]+builder->lambdav;
+        }
+        
+        /*
+         * Transform Q from conditionally positive definite to the (simply) positive definite one:
+         * multiply linear system Q*x=RHS from both sides by (I-Q1'*Q1), apply additional regularization.
+         *
+         * NOTE: RHS is also multiplied by (I-Q1'*Q1), but from the left only.
+         */
+        rallocv(ncenters, &buf->z, _state);
+        for(i=0; i<=ncenters-1; i++)
+        {
+            rcopyrv(ncenters, &buf->q, i, &buf->z, _state);
+            rowwisegramschmidt(&buf->q1, ortbasissize, ncenters, &buf->z, &buf->y, ae_false, _state);
+            rcopyvr(ncenters, &buf->z, &buf->q, i, _state);
+        }
+        for(i=0; i<=ncenters-1; i++)
+        {
+            rcopycv(ncenters, &buf->q, i, &buf->z, _state);
+            rowwisegramschmidt(&buf->q1, ortbasissize, ncenters, &buf->z, &buf->y, ae_false, _state);
+            rcopyvc(ncenters, &buf->z, &buf->q, i, _state);
+        }
+        for(i=0; i<=batchsize-1; i++)
+        {
+            rcopyrv(ncenters, &buf->b, i, &buf->z, _state);
+            rowwisegramschmidt(&buf->q1, ortbasissize, ncenters, &buf->z, &buf->y, ae_false, _state);
+            rcopyvr(ncenters, &buf->z, &buf->b, i, _state);
+        }
+        mx = 1.0;
+        for(i=0; i<=ncenters-1; i++)
+        {
+            mx = ae_maxreal(mx, ae_fabs(buf->q.ptr.pp_double[i][i], _state), _state);
+        }
+        for(i=0; i<=ncenters-1; i++)
+        {
+            rcopyrv(ncenters, &buf->q, i, &buf->z, _state);
+            for(j=0; j<=ortbasissize-1; j++)
+            {
+                raddrv(ncenters, mx*buf->q1.ptr.pp_double[j][i], &buf->q1, j, &buf->z, _state);
+            }
+            rcopyvr(ncenters, &buf->z, &buf->q, i, _state);
+        }
+        if( builder->dodetailedtrace )
+        {
+            
+            /*
+             * Compute condition number for future reports
+             */
+            dbgcondq = 1/(spdmatrixrcond(&buf->q, ncenters, ae_false, _state)+ae_machineepsilon);
+        }
+        else
+        {
+            dbgcondq = (double)(0);
+        }
+        for(i=0; i<=ncenters-1; i++)
+        {
+            buf->q.ptr.pp_double[i][i] = buf->q.ptr.pp_double[i][i]+reg*mx;
+        }
+        
+        /*
+         * Perform Cholesky factorization, solve and obtain RBF coefficients (we still have
+         * to compute polynomial term - it will be done later)
+         */
+        if( !spdmatrixcholeskyrec(&buf->q, 0, ncenters, ae_false, &buf->choltmp, _state) )
+        {
+            ae_assert(ae_false, "RBFV3: ACBF solver failed due to extreme degeneracy", _state);
+        }
+        rmatrixrighttrsm(batchsize, ncenters, &buf->q, 0, 0, ae_false, ae_false, 1, &buf->b, 0, 0, _state);
+        rmatrixrighttrsm(batchsize, ncenters, &buf->q, 0, 0, ae_false, ae_false, 0, &buf->b, 0, 0, _state);
+        
+        /*
+         * Now, having RBF coefficients we can compute residual from fitting ACBF targets
+         * with pure RBF term and fit polynomial term to this residual. In the ideal world
+         * it should result in the nice and precise polynomial coefficients.
+         */
+        rallocv(ncenters, &buf->z, _state);
+        rsetallocm(batchsize, ncenters, 0.0, &buf->c, _state);
+        for(i=0; i<=batchsize-1; i++)
+        {
+            buf->c.ptr.pp_double[i][i] = 1.0;
+        }
+        rmatrixgemm(batchsize, ncenters, ncenters, -1.0, &buf->b, 0, 0, 0, &buf->atwrk, 0, 0, 1, 1.0, &buf->c, 0, 0, _state);
+        for(i=0; i<=batchsize-1; i++)
+        {
+            rcopyrv(ncenters, &buf->c, i, &buf->z, _state);
+            rowwisegramschmidt(&buf->q1, ortbasissize, ncenters, &buf->z, &buf->y, ae_true, _state);
+            rmatrixtrsv(ortbasissize, &buf->r, 0, 0, ae_true, ae_false, 0, &buf->y, 0, _state);
+            for(j=0; j<=nx; j++)
+            {
+                buf->b.ptr.pp_double[i][ncenters+j] = 0.0;
+            }
+            for(j=0; j<=ortbasissize-1; j++)
+            {
+                buf->b.ptr.pp_double[i][ncenters+ortbasismap.ptr.p_int[j]] = buf->y.ptr.p_double[j];
+            }
+        }
+        
+        /*
+         * Trace if needeed
+         */
+        if( builder->dodetailedtrace )
+        {
+            rallocm(batchsize, ncenters, &dbgb, _state);
+            rmatrixgemm(batchsize, ncenters, ncoeff, -1.0, &buf->b, 0, 0, 0, &buf->atwrk, 0, 0, 0, 0.0, &dbgb, 0, 0, _state);
+            for(i=0; i<=batchsize-1; i++)
+            {
+                dbgb.ptr.pp_double[i][i] = dbgb.ptr.pp_double[i][i]+1.0;
+            }
+            dbgmaxc = (double)(0);
+            for(i=0; i<=batchsize-1; i++)
+            {
+                dbgmaxc = ae_maxreal(dbgmaxc, rmaxabsr(ncenters, &buf->b, i, _state), _state);
+            }
+            dbgerrnodes = (double)(0);
+            for(i=0; i<=batchsize-1; i++)
+            {
+                dbgerrnodes = dbgerrnodes+rdotrr(ncenters, &dbgb, i, &dbgb, i, _state);
+            }
+            dbgerrnodes = ae_sqrt(dbgerrnodes/(batchsize*ncenters), _state);
+            dbgerrort = (double)(0);
+            for(i=0; i<=batchsize-1; i++)
+            {
+                for(j=0; j<=ortbasissize-1; j++)
+                {
+                    dbgerrort = ae_maxreal(dbgerrort, ae_fabs(rdotrr(ncenters, &buf->b, i, &buf->q1, j, _state), _state), _state);
+                }
+            }
+            ae_trace("[ACBF_subprob]    BatchSize=%3d    NCenters=%4d    RadiusExpansions=%0d    cond(Q)=%0.2e    max|C|=%0.2e    rmsErr=%0.2e    OrtErr=%0.2e\n",
+                (int)(batchsize),
+                (int)(ncenters),
+                (int)(expansionscount),
+                (double)(dbgcondq),
+                (double)(dbgmaxc),
+                (double)(dbgerrnodes),
+                (double)(dbgerrort));
+        }
+    }
+    
+    /*
+     * Solve and save solution to Builder.ChunksPool
+     */
+    ae_shared_pool_retrieve(&builder->chunksproducer, &_precchunk, _state);
+    ae_assert(precchunk->ntargetrows==-117, "RBFV3: integrity check 9724 failed", _state);
+    ae_assert(precchunk->ntargetcols==-119, "RBFV3: integrity check 9725 failed", _state);
+    precchunk->ntargetrows = batchsize;
+    precchunk->ntargetcols = ncoeff;
+    iallocv(precchunk->ntargetrows, &precchunk->targetrows, _state);
+    iallocv(precchunk->ntargetcols, &precchunk->targetcols, _state);
+    rallocm(batchsize, ncoeff, &precchunk->s, _state);
+    for(widx=0; widx<=batchsize-1; widx++)
+    {
+        precchunk->targetrows.ptr.p_int[widx] = builder->wrkidx.ptr.p_int[wrk0+widx];
+    }
+    iallocv(ncoeff, &buf->perm, _state);
+    for(k=0; k<=ncoeff-1; k++)
+    {
+        if( k<ncenters )
+        {
+            precchunk->targetcols.ptr.p_int[k] = buf->currentnodes.ptr.p_int[k];
+        }
+        else
+        {
+            precchunk->targetcols.ptr.p_int[k] = builder->ntotal+(k-ncenters);
+        }
+        buf->perm.ptr.p_int[k] = k;
+    }
+    tagsortmiddleii(&precchunk->targetcols, &buf->perm, 0, ncoeff, _state);
+    for(widx=0; widx<=batchsize-1; widx++)
+    {
+        for(k=0; k<=ncoeff-1; k++)
+        {
+            precchunk->s.ptr.pp_double[widx][k] = buf->b.ptr.pp_double[widx][buf->perm.ptr.p_int[k]];
+        }
+    }
+    ae_shared_pool_recycle(&builder->chunkspool, &_precchunk, _state);
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+Recursive ACBF preconditioner generation subroutine.
+
+PARAMETERS:
+    Builder             -   ACBF builder object
+    Wrk0, Wrk1          -   elements [Wrk0...Wrk1-1] of Builder.WrkIdx[]
+                            array store row indexes of XX that are processed.
+    
+OUTPUT:
+    Builder.OutputPool is updated with new chunks
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_computeacbfpreconditionerrecv2(acbfbuilder* builder,
+     ae_int_t wrk0,
+     ae_int_t wrk1,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    ae_task_group *_child_tasks = NULL;
+    ae_bool _smp_enabled = ae_false;
+    ae_int_t nx;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k0;
+    ae_int_t k1;
+    ae_int_t largestdim;
+    double splitval;
+    double basecasecomplexity;
+    acbfbuffer *buf;
+    ae_smart_ptr _buf;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&_buf, 0, sizeof(_buf));
+    ae_smart_ptr_init(&_buf, (void**)&buf, _state, ae_true);
+
+    nx = builder->nx;
+    if( wrk1<=wrk0 )
+    {
+        ae_sync(_child_tasks, _smp_enabled, ae_true, _state);
+        ae_frame_leave(_state);
+        return;
+    }
+    basecasecomplexity = rmul3((double)(builder->nglobal+builder->nlocal+2*builder->ncorrection), (double)(builder->nglobal+builder->nlocal+2*builder->ncorrection), (double)(builder->nglobal+builder->nlocal+2*builder->ncorrection), _state);
+    
+    /*
+     * Decide on parallelism
+     */
+    if( ae_fp_greater_eq(rmul2((double)(builder->ntotal), basecasecomplexity, _state),smpactivationlevel(_state))&&builder->ntotal>=rbfv3_acbfparallelthreshold )
+    {
+        if( _trypexec_rbfv3_computeacbfpreconditionerrecv2(builder,wrk0,wrk1, _state) )
+        {
+            ae_sync(_child_tasks, _smp_enabled, ae_true, _state);
+            ae_frame_leave(_state);
+            return;
+        }
+    }
+    
+    /*
+     * Retrieve temporary buffer
+     */
+    ae_shared_pool_retrieve(&builder->bufferpool, &_buf, _state);
+    
+    /*
+     * Analyze current working set
+     */
+    rallocv(nx, &buf->tmpboxmin, _state);
+    rallocv(nx, &buf->tmpboxmax, _state);
+    rcopyrv(nx, &builder->xx, builder->wrkidx.ptr.p_int[wrk0], &buf->tmpboxmin, _state);
+    rcopyrv(nx, &builder->xx, builder->wrkidx.ptr.p_int[wrk0], &buf->tmpboxmax, _state);
+    for(i=wrk0+1; i<=wrk1-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            buf->tmpboxmin.ptr.p_double[j] = ae_minreal(buf->tmpboxmin.ptr.p_double[j], builder->xx.ptr.pp_double[builder->wrkidx.ptr.p_int[i]][j], _state);
+            buf->tmpboxmax.ptr.p_double[j] = ae_maxreal(buf->tmpboxmax.ptr.p_double[j], builder->xx.ptr.pp_double[builder->wrkidx.ptr.p_int[i]][j], _state);
+        }
+    }
+    largestdim = 0;
+    for(j=1; j<=nx-1; j++)
+    {
+        if( ae_fp_greater(buf->tmpboxmax.ptr.p_double[j]-buf->tmpboxmin.ptr.p_double[j],buf->tmpboxmax.ptr.p_double[largestdim]-buf->tmpboxmin.ptr.p_double[largestdim]) )
+        {
+            largestdim = j;
+        }
+    }
+    
+    /*
+     * Perform either batch processing or recursive split
+     */
+    if( wrk1-wrk0<=builder->batchsize||ae_fp_eq(buf->tmpboxmax.ptr.p_double[largestdim],buf->tmpboxmin.ptr.p_double[largestdim]) )
+    {
+        
+        /*
+         * Either working set size is small enough or all points are non-distinct.
+         * Perform batch processing
+         */
+        rbfv3_computeacbfpreconditionerbasecase(builder, buf, wrk0, wrk1, _state);
+        
+        /*
+         * Recycle temporary buffers
+         */
+        ae_shared_pool_recycle(&builder->bufferpool, &_buf, _state);
+    }
+    else
+    {
+        
+        /*
+         * Compute recursive split along largest axis
+         */
+        splitval = 0.5*(buf->tmpboxmax.ptr.p_double[largestdim]+buf->tmpboxmin.ptr.p_double[largestdim]);
+        k0 = wrk0;
+        k1 = wrk1-1;
+        while(k0<=k1)
+        {
+            if( ae_fp_less_eq(builder->xx.ptr.pp_double[builder->wrkidx.ptr.p_int[k0]][largestdim],splitval) )
+            {
+                k0 = k0+1;
+                continue;
+            }
+            if( ae_fp_greater(builder->xx.ptr.pp_double[builder->wrkidx.ptr.p_int[k1]][largestdim],splitval) )
+            {
+                k1 = k1-1;
+                continue;
+            }
+            swapelementsi(&builder->wrkidx, k0, k1, _state);
+            k0 = k0+1;
+            k1 = k1-1;
+        }
+        ae_assert(k0>wrk0&&k1<wrk1-1, "ACBF: integrity check 2843 in the recursive subdivision code failed", _state);
+        ae_assert(k0==k1+1, "ACBF: integrity check 8364 in the recursive subdivision code failed", _state);
+        
+        /*
+         * Recycle temporary buffer, perform recursive calls
+         */
+        ae_shared_pool_recycle(&builder->bufferpool, &_buf, _state);
+        ae_set_smp_support(&_child_tasks, &_smp_enabled, ae_fp_greater_eq(ae_minreal((double)(k0-wrk0), (double)(wrk1-k0), _state)*basecasecomplexity,spawnlevel(_state)), _state);
+        _spawn_rbfv3_computeacbfpreconditionerrecv2(builder, wrk0, k0, _child_tasks, _smp_enabled, _state);
+        rbfv3_computeacbfpreconditionerrecv2(builder, k0, wrk1, _state);
+        ae_sync(_child_tasks, _smp_enabled, ae_false, _state);
+    }
+    ae_sync(_child_tasks, _smp_enabled, ae_true, _state);
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+When called in the multithreaded mode (non-NULL _group), spawns child task.
+Executed serially when called with NULL _group.
+*************************************************************************/
+void _spawn_rbfv3_computeacbfpreconditionerrecv2(acbfbuilder* builder,
+    ae_int_t wrk0,
+    ae_int_t wrk1,
+    ae_task_group *_group, ae_bool smp_enabled, ae_state *_state)
+{
+    if( _group==NULL || !smp_enabled)
+    {
+        rbfv3_computeacbfpreconditionerrecv2(builder,wrk0,wrk1, _state);
+        return;
+    }
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+    {
+        ae_task_info *_task;
+        _task = ae_create_task(_group, _state);
+        _task->data.func = _task_rbfv3_computeacbfpreconditionerrecv2;
+        _task->data.flags = _state->flags;
+        _task->data.parameters[0].value.val = builder;
+        _task->data.parameters[1].value.ival = wrk0;
+        _task->data.parameters[2].value.ival = wrk1;
+        ae_push_task(_task, _state, ae_false);
+    }
+#else
+    abort(); /* critical integrity failure */
+#endif
+}
+
+
+/*************************************************************************
+This method is called when worker thread starts working on a non-root task.
+*************************************************************************/
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+void _task_rbfv3_computeacbfpreconditionerrecv2(ae_task_data *_data, ae_state *_state)
+{
+    acbfbuilder* builder;
+    ae_int_t wrk0;
+    ae_int_t wrk1;
+    builder = (acbfbuilder*)_data->parameters[0].value.val;
+    wrk0 = _data->parameters[1].value.ival;
+    wrk1 = _data->parameters[2].value.ival;
+   ae_state_set_flags(_state, _data->flags);
+   rbfv3_computeacbfpreconditionerrecv2(builder,wrk0,wrk1, _state);
+}
+#endif
+
+
+/*************************************************************************
+Inserts task as root into worker queue if called from non-worker thread, waits for completion and returns true.
+Returns false if ALGLIB is configured for serial execution or we are already in the worker context.
+*************************************************************************/
+ae_bool _trypexec_rbfv3_computeacbfpreconditionerrecv2(acbfbuilder* builder,
+    ae_int_t wrk0,
+    ae_int_t wrk1,
+    ae_state *_state)
+{
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+    ae_task_info *_task;
+    const char *_e;
+    if( !ae_can_pexec(_state) )
+        return ae_false;
+    _task = ae_create_task(NULL, _state);
+    _task->data.func = _task_rbfv3_computeacbfpreconditionerrecv2;
+    _task->data.flags = _state->flags;
+    _task->data.parameters[0].value.val = builder;
+    _task->data.parameters[1].value.ival = wrk0;
+    _task->data.parameters[2].value.ival = wrk1;
+    ae_push_root_task(_task);
+    ae_wait_for_event(&_task->done_event);
+    _e = _task->exception;
+    ae_dispose_task(_task);
+    ae_assert(_e==NULL, _e, _state);
+    return ae_true;
+#else
+    return ae_false;
+#endif
+}
+
+
+/*************************************************************************
+This function generates ACBF (approximate cardinal basis functions)
+preconditioner.
+
+PARAMETERS:
+    XX                  -   dataset (X-values), array[N,NX]
+    N                   -   points count, N>=1
+    NX                  -   dimensions count, NX>=1
+    FuncType            -   basis function type
+    
+OUTPUT:
+    SP                  -   preconditioner, sparse matrix in CRS format
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_computeacbfpreconditioner(/* Real    */ ae_matrix* xx,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_int_t functype,
+     double funcparam,
+     ae_int_t aterm,
+     ae_int_t batchsize,
+     ae_int_t nglobal,
+     ae_int_t nlocal,
+     ae_int_t ncorrection,
+     ae_int_t correctorgrowth,
+     ae_int_t simplificationfactor,
+     double lambdav,
+     sparsematrix* sp,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    acbfbuilder builder;
+    acbfbuffer bufferseed;
+    acbfchunk chunkseed;
+    acbfchunk *precchunk;
+    ae_smart_ptr _precchunk;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t offs;
+    ae_vector idummy;
+    ae_vector rowsizes;
+    ae_vector boxmin;
+    ae_vector boxmax;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&builder, 0, sizeof(builder));
+    memset(&bufferseed, 0, sizeof(bufferseed));
+    memset(&chunkseed, 0, sizeof(chunkseed));
+    memset(&_precchunk, 0, sizeof(_precchunk));
+    memset(&idummy, 0, sizeof(idummy));
+    memset(&rowsizes, 0, sizeof(rowsizes));
+    memset(&boxmin, 0, sizeof(boxmin));
+    memset(&boxmax, 0, sizeof(boxmax));
+    _acbfbuilder_init(&builder, _state, ae_true);
+    _acbfbuffer_init(&bufferseed, _state, ae_true);
+    _acbfchunk_init(&chunkseed, _state, ae_true);
+    ae_smart_ptr_init(&_precchunk, (void**)&precchunk, _state, ae_true);
+    ae_vector_init(&idummy, 0, DT_INT, _state, ae_true);
+    ae_vector_init(&rowsizes, 0, DT_INT, _state, ae_true);
+    ae_vector_init(&boxmin, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&boxmax, 0, DT_REAL, _state, ae_true);
+
+    ae_assert(n>=1, "RBFV3: integrity check 2524 failed", _state);
+    
+    /*
+     * Prepare builder
+     */
+    builder.dodetailedtrace = ae_is_trace_enabled("RBF.DETAILED");
+    builder.functype = functype;
+    builder.funcparam = funcparam;
+    builder.ntotal = n;
+    builder.nx = nx;
+    builder.batchsize = batchsize;
+    if( nglobal>0 )
+    {
+        rbfv3_selectglobalnodes(xx, n, nx, &idummy, 0, nglobal, &builder.globalgrid, &builder.nglobal, &builder.globalgridseparation, _state);
+    }
+    else
+    {
+        builder.nglobal = 0;
+    }
+    builder.nlocal = nlocal;
+    builder.ncorrection = ncorrection;
+    builder.correctorgrowth = (double)(correctorgrowth);
+    builder.lambdav = lambdav;
+    builder.aterm = aterm;
+    rcopyallocm(n, nx, xx, &builder.xx, _state);
+    rallocv(nx, &boxmin, _state);
+    rallocv(nx, &boxmax, _state);
+    rcopyrv(nx, xx, 0, &boxmin, _state);
+    rcopyrv(nx, xx, 0, &boxmax, _state);
+    for(i=1; i<=n-1; i++)
+    {
+        rmergeminrv(nx, xx, i, &boxmin, _state);
+        rmergemaxrv(nx, xx, i, &boxmax, _state);
+    }
+    builder.roughdatasetdiameter = (double)(0);
+    for(i=0; i<=nx-1; i++)
+    {
+        builder.roughdatasetdiameter = builder.roughdatasetdiameter+ae_sqr(boxmax.ptr.p_double[i]-boxmin.ptr.p_double[i], _state);
+    }
+    builder.roughdatasetdiameter = ae_sqrt(builder.roughdatasetdiameter, _state);
+    iallocv(n, &builder.wrkidx, _state);
+    for(i=0; i<=n-1; i++)
+    {
+        builder.wrkidx.ptr.p_int[i] = i;
+    }
+    kdtreebuildtagged(xx, &builder.wrkidx, n, nx, 0, 2, &builder.kdt, _state);
+    rbfv3_buildsimplifiedkdtree(xx, n, nx, ae_round(ae_pow((double)(simplificationfactor), (double)(nx), _state), _state), ae_round(ae_pow((double)(5), (double)(nx), _state), _state), &builder.kdt1, _state);
+    rbfv3_buildsimplifiedkdtree(xx, n, nx, ae_round(ae_pow((double)(simplificationfactor), (double)(2*nx), _state), _state), ae_round(ae_pow((double)(5), (double)(nx), _state), _state), &builder.kdt2, _state);
+    bsetallocv(n, ae_false, &bufferseed.bflags, _state);
+    rallocv(nx, &bufferseed.tmpboxmin, _state);
+    rallocv(nx, &bufferseed.tmpboxmax, _state);
+    kdtreecreaterequestbuffer(&builder.kdt, &bufferseed.kdtbuf, _state);
+    kdtreecreaterequestbuffer(&builder.kdt1, &bufferseed.kdt1buf, _state);
+    kdtreecreaterequestbuffer(&builder.kdt2, &bufferseed.kdt2buf, _state);
+    ae_shared_pool_set_seed(&builder.bufferpool, &bufferseed, sizeof(bufferseed), _acbfbuffer_init, _acbfbuffer_init_copy, _acbfbuffer_destroy, _state);
+    chunkseed.ntargetrows = -117;
+    chunkseed.ntargetcols = -119;
+    ae_shared_pool_set_seed(&builder.chunksproducer, &chunkseed, sizeof(chunkseed), _acbfchunk_init, _acbfchunk_init_copy, _acbfchunk_destroy, _state);
+    ae_shared_pool_set_seed(&builder.chunkspool, &chunkseed, sizeof(chunkseed), _acbfchunk_init, _acbfchunk_init_copy, _acbfchunk_destroy, _state);
+    
+    /*
+     * Prepare preconditioner matrix
+     */
+    rbfv3_computeacbfpreconditionerrecv2(&builder, 0, n, _state);
+    isetallocv(n, -1, &rowsizes, _state);
+    ae_shared_pool_first_recycled(&builder.chunkspool, &_precchunk, _state);
+    while(precchunk!=NULL)
+    {
+        for(i=0; i<=precchunk->ntargetrows-1; i++)
+        {
+            ae_assert(rowsizes.ptr.p_int[precchunk->targetrows.ptr.p_int[i]]==-1, "RBFV3: integrity check 2568 failed", _state);
+            rowsizes.ptr.p_int[precchunk->targetrows.ptr.p_int[i]] = precchunk->ntargetcols;
+        }
+        ae_shared_pool_next_recycled(&builder.chunkspool, &_precchunk, _state);
+    }
+    sp->matrixtype = 1;
+    sp->m = n+nx+1;
+    sp->n = n+nx+1;
+    iallocv(n+nx+2, &sp->ridx, _state);
+    sp->ridx.ptr.p_int[0] = 0;
+    for(i=0; i<=n-1; i++)
+    {
+        ae_assert(rowsizes.ptr.p_int[i]>0, "RBFV3: integrity check 2668 failed", _state);
+        sp->ridx.ptr.p_int[i+1] = sp->ridx.ptr.p_int[i]+rowsizes.ptr.p_int[i];
+    }
+    for(i=n; i<=n+nx; i++)
+    {
+        sp->ridx.ptr.p_int[i+1] = sp->ridx.ptr.p_int[i]+1;
+    }
+    iallocv(sp->ridx.ptr.p_int[sp->m], &sp->idx, _state);
+    rallocv(sp->ridx.ptr.p_int[sp->m], &sp->vals, _state);
+    for(i=n; i<=n+nx; i++)
+    {
+        sp->idx.ptr.p_int[sp->ridx.ptr.p_int[i]] = i;
+        sp->vals.ptr.p_double[sp->ridx.ptr.p_int[i]] = 1.0;
+    }
+    ae_shared_pool_first_recycled(&builder.chunkspool, &_precchunk, _state);
+    while(precchunk!=NULL)
+    {
+        for(i=0; i<=precchunk->ntargetrows-1; i++)
+        {
+            offs = sp->ridx.ptr.p_int[precchunk->targetrows.ptr.p_int[i]];
+            for(j=0; j<=precchunk->ntargetcols-1; j++)
+            {
+                sp->idx.ptr.p_int[offs+j] = precchunk->targetcols.ptr.p_int[j];
+                sp->vals.ptr.p_double[offs+j] = precchunk->s.ptr.pp_double[i][j];
+            }
+        }
+        ae_shared_pool_next_recycled(&builder.chunkspool, &_precchunk, _state);
+    }
+    sp->ninitialized = sp->ridx.ptr.p_int[sp->m];
+    sparseinitduidx(sp, _state);
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+Basecase initialization routine for DDM solver.
+
+
+Appends an instance of RBF3DDMSubproblem to Solver.SubproblemsPool.
+
+INPUT PARAMETERS:
+    Solver      -   solver object. This function may be  called  from  the
+                    multiple threads, so it  is  important  to  work  with
+                    Solver object using only thread-safe functions.
+    X           -   array[N,NX], dataset points
+    N, NX       -   dataset metrics, N>0, NX>0
+    BFMatrix    -   basis function matrix object
+    LambdaV     -   smoothing parameter
+    SP          -   sparse ACBF preconditioner, (N+NX+1)*(N+NX+1) matrix
+                    stored in CRS format
+    Buf         -   an instance of RBF3DDMBuffer, reusable temporary buffers
+    TgtIdx      -   array[], contains indexes of points in the current target
+                    set. Elements [Tgt0,Tgt1) are processed by this function.
+    NNeighbors  -   neighbors count; NNeighbors nearby nodes are added  to
+                    inner points of the chunk
+    DoDetailedTrace-whether trace output is needed or not. When trace is
+                    activated, solver computes condition numbers. It results
+                    in the several-fold slowdown of the algorithm.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_ddmsolverinitbasecase(rbf3ddmsolver* solver,
+     /* Real    */ ae_matrix* x,
+     ae_int_t n,
+     ae_int_t nx,
+     rbf3evaluator* bfmatrix,
+     double lambdav,
+     sparsematrix* sp,
+     rbf3ddmbuffer* buf,
+     /* Integer */ ae_vector* tgtidx,
+     ae_int_t tgt0,
+     ae_int_t tgt1,
+     ae_int_t nneighbors,
+     ae_bool dodetailedtrace,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    rbf3ddmsubproblem *subproblem;
+    ae_smart_ptr _subproblem;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    ae_int_t nc;
+    ae_int_t nk;
+    double v;
+    double reg;
+    ae_int_t nwrk;
+    ae_int_t npreccol;
+    ae_vector neighbors;
+    ae_vector workingnodes;
+    ae_vector preccolumns;
+    ae_vector tau;
+    ae_matrix q;
+    ae_vector x0;
+    double lurcond;
+    ae_bool lusuccess;
+    ae_int_t ni;
+    ae_int_t j0;
+    ae_int_t j1;
+    ae_int_t jj;
+    ae_matrix suba;
+    ae_matrix subsp;
+    ae_matrix dbga;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&_subproblem, 0, sizeof(_subproblem));
+    memset(&neighbors, 0, sizeof(neighbors));
+    memset(&workingnodes, 0, sizeof(workingnodes));
+    memset(&preccolumns, 0, sizeof(preccolumns));
+    memset(&tau, 0, sizeof(tau));
+    memset(&q, 0, sizeof(q));
+    memset(&x0, 0, sizeof(x0));
+    memset(&suba, 0, sizeof(suba));
+    memset(&subsp, 0, sizeof(subsp));
+    memset(&dbga, 0, sizeof(dbga));
+    ae_smart_ptr_init(&_subproblem, (void**)&subproblem, _state, ae_true);
+    ae_vector_init(&neighbors, 0, DT_INT, _state, ae_true);
+    ae_vector_init(&workingnodes, 0, DT_INT, _state, ae_true);
+    ae_vector_init(&preccolumns, 0, DT_INT, _state, ae_true);
+    ae_vector_init(&tau, 0, DT_REAL, _state, ae_true);
+    ae_matrix_init(&q, 0, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&x0, 0, DT_REAL, _state, ae_true);
+    ae_matrix_init(&suba, 0, 0, DT_REAL, _state, ae_true);
+    ae_matrix_init(&subsp, 0, 0, DT_REAL, _state, ae_true);
+    ae_matrix_init(&dbga, 0, 0, DT_REAL, _state, ae_true);
+
+    ae_assert(tgt1-tgt0>0, "RBFV3: integrity check 7364 failed", _state);
+    ae_assert(nneighbors>=1, "RBFV3: integrity check 7365 failed", _state);
+    reg = (100+ae_sqrt((double)(tgt1-tgt0+nneighbors), _state))*ae_machineepsilon;
+    
+    /*
+     * Retrieve fresh subproblem. We expect that Solver.SubproblemsBuffer contains
+     * no recycled entries and that fresh subproblem with Subproblem.IsValid=False
+     * is returned.
+     *
+     * Start initialization
+     */
+    ae_shared_pool_retrieve(&solver->subproblemsbuffer, &_subproblem, _state);
+    ae_assert(!subproblem->isvalid, "RBFV3: SubproblemsBuffer integrity check failed", _state);
+    subproblem->isvalid = ae_true;
+    subproblem->ntarget = tgt1-tgt0;
+    iallocv(tgt1-tgt0, &subproblem->targetnodes, _state);
+    icopyvx(tgt1-tgt0, tgtidx, tgt0, &subproblem->targetnodes, 0, _state);
+    
+    /*
+     * Prepare working arrays
+     */
+    rallocv(nx, &x0, _state);
+    
+    /*
+     * Determine working set: target nodes + neighbors of targets.
+     * Prepare mapping from node index to position in WorkingNodes[]
+     */
+    nwrk = 0;
+    iallocv(tgt1-tgt0, &workingnodes, _state);
+    for(i=tgt0; i<=tgt1-1; i++)
+    {
+        nk = tgtidx->ptr.p_int[i];
+        buf->bflags.ptr.p_bool[nk] = ae_true;
+        workingnodes.ptr.p_int[nwrk] = nk;
+        nwrk = nwrk+1;
+    }
+    for(i=tgt0; i<=tgt1-1; i++)
+    {
+        rcopyrv(nx, x, tgtidx->ptr.p_int[i], &x0, _state);
+        nc = kdtreetsqueryknn(&solver->kdt, &buf->kdtbuf, &x0, nneighbors, ae_true, _state);
+        kdtreetsqueryresultstags(&solver->kdt, &buf->kdtbuf, &neighbors, _state);
+        for(k=0; k<=nc-1; k++)
+        {
+            nk = neighbors.ptr.p_int[k];
+            if( !buf->bflags.ptr.p_bool[nk] )
+            {
+                buf->bflags.ptr.p_bool[nk] = ae_true;
+                igrowv(nwrk+1, &workingnodes, _state);
+                workingnodes.ptr.p_int[nwrk] = nk;
+                nwrk = nwrk+1;
+            }
+        }
+    }
+    for(i=0; i<=nwrk-1; i++)
+    {
+        buf->bflags.ptr.p_bool[workingnodes.ptr.p_int[i]] = ae_false;
+    }
+    ae_assert(nwrk>0, "ACBF: integrity check for NWrk failed", _state);
+    subproblem->nwork = nwrk;
+    icopyallocv(nwrk, &workingnodes, &subproblem->workingnodes, _state);
+    
+    /*
+     * Determine preconditioner columns that have nonzeros in rows corresponding
+     * to working nodes. Prepare mapping from [0,N+NX+1) column indexing to [0,NPrecCol)
+     * compressed one. Only these columns are extracted from the preconditioner
+     * during design system computation.
+     *
+     * NOTE: we ensure that preconditioner columns N...N+NX which correspond to linear
+     *       terms are placed last. It greatly simplifies desi
+     */
+    npreccol = 0;
+    for(i=0; i<=nwrk-1; i++)
+    {
+        j0 = sp->ridx.ptr.p_int[workingnodes.ptr.p_int[i]];
+        j1 = sp->ridx.ptr.p_int[workingnodes.ptr.p_int[i]+1]-1;
+        for(jj=j0; jj<=j1; jj++)
+        {
+            j = sp->idx.ptr.p_int[jj];
+            if( j<n&&!buf->bflags.ptr.p_bool[j] )
+            {
+                buf->bflags.ptr.p_bool[j] = ae_true;
+                igrowv(npreccol+1, &preccolumns, _state);
+                preccolumns.ptr.p_int[npreccol] = j;
+                npreccol = npreccol+1;
+            }
+        }
+    }
+    for(j=n; j<=n+nx; j++)
+    {
+        ae_assert(!buf->bflags.ptr.p_bool[j], "RBFV3: integrity check 9435 failed", _state);
+        buf->bflags.ptr.p_bool[j] = ae_true;
+        igrowv(npreccol+1, &preccolumns, _state);
+        preccolumns.ptr.p_int[npreccol] = j;
+        npreccol = npreccol+1;
+    }
+    for(i=0; i<=npreccol-1; i++)
+    {
+        buf->idx2preccol.ptr.p_int[preccolumns.ptr.p_int[i]] = i;
+        buf->bflags.ptr.p_bool[preccolumns.ptr.p_int[i]] = ae_false;
+    }
+    
+    /*
+     * Generate working system, apply regularization
+     */
+    rsetallocm(nwrk, npreccol, 0.0, &suba, _state);
+    rbfv3_modelmatrixcomputepartial(bfmatrix, &workingnodes, nwrk, &preccolumns, npreccol-(nx+1), &suba, _state);
+    for(i=0; i<=nwrk-1; i++)
+    {
+        ni = workingnodes.ptr.p_int[i];
+        for(j=0; j<=nx-1; j++)
+        {
+            suba.ptr.pp_double[i][npreccol-(nx+1)+j] = x->ptr.pp_double[ni][j];
+        }
+        suba.ptr.pp_double[i][npreccol-1] = 1.0;
+    }
+    for(i=0; i<=nwrk-1; i++)
+    {
+        j = buf->idx2preccol.ptr.p_int[workingnodes.ptr.p_int[i]];
+        suba.ptr.pp_double[i][j] = suba.ptr.pp_double[i][j]+lambdav;
+    }
+    rsetallocm(nwrk, npreccol, 0.0, &subsp, _state);
+    for(i=0; i<=nwrk-1; i++)
+    {
+        ni = workingnodes.ptr.p_int[i];
+        j0 = sp->ridx.ptr.p_int[ni];
+        j1 = sp->ridx.ptr.p_int[ni+1]-1;
+        for(jj=j0; jj<=j1; jj++)
+        {
+            subsp.ptr.pp_double[i][buf->idx2preccol.ptr.p_int[sp->idx.ptr.p_int[jj]]] = sp->vals.ptr.p_double[jj];
+        }
+    }
+    rallocm(nwrk, nwrk, &subproblem->regsystem, _state);
+    rmatrixgemm(nwrk, nwrk, npreccol, 1.0, &suba, 0, 0, 0, &subsp, 0, 0, 1, 0.0, &subproblem->regsystem, 0, 0, _state);
+    
+    /*
+     * Try solving with LU decomposition
+     */
+    rcopyallocm(nwrk, nwrk, &subproblem->regsystem, &subproblem->wrklu, _state);
+    rmatrixlu(&subproblem->wrklu, nwrk, nwrk, &subproblem->wrkp, _state);
+    lurcond = rmatrixlurcondinf(&subproblem->wrklu, nwrk, _state);
+    if( ae_fp_greater(lurcond,ae_sqrt(ae_machineepsilon, _state)) )
+    {
+        
+        /*
+         * LU success
+         */
+        subproblem->decomposition = 0;
+        lusuccess = ae_true;
+        if( dodetailedtrace )
+        {
+            ae_trace(">> DDM subproblem:  LU success, |target|=%4d,  |wrk|=%4d,  |preccol|=%4d, cond(LU)=%0.2e\n",
+                (int)(tgt1-tgt0),
+                (int)(nwrk),
+                (int)(npreccol),
+                (double)(1/(lurcond+ae_machineepsilon)));
+        }
+    }
+    else
+    {
+        lusuccess = ae_false;
+    }
+    
+    /*
+     * Apply regularized QR if needed
+     */
+    if( !lusuccess )
+    {
+        rsetallocm(2*nwrk, nwrk, 0.0, &subproblem->wrkr, _state);
+        rcopym(nwrk, nwrk, &subproblem->regsystem, &subproblem->wrkr, _state);
+        v = ae_sqrt(reg, _state);
+        for(i=0; i<=nwrk-1; i++)
+        {
+            subproblem->wrkr.ptr.pp_double[nwrk+i][i] = v;
+        }
+        rmatrixqr(&subproblem->wrkr, 2*nwrk, nwrk, &tau, _state);
+        rmatrixqrunpackq(&subproblem->wrkr, 2*nwrk, nwrk, &tau, nwrk, &subproblem->wrkq, _state);
+        subproblem->decomposition = 1;
+        if( dodetailedtrace )
+        {
+            ae_trace(">> DDM subproblem:  LU failure, using reg-QR, |target|=%4d,  |wrk|=%4d,  |preccol|=%4d, cond(R)=%0.2e (cond(LU)=%0.2e)\n",
+                (int)(tgt1-tgt0),
+                (int)(nwrk),
+                (int)(npreccol),
+                (double)(1/(rmatrixtrrcondinf(&subproblem->wrkr, nwrk, ae_true, ae_false, _state)+ae_machineepsilon)),
+                (double)(1/(lurcond+ae_machineepsilon)));
+        }
+    }
+    
+    /*
+     * Subproblem is ready.
+     * Move it to the SubproblemsPool
+     */
+    ae_shared_pool_recycle(&solver->subproblemspool, &_subproblem, _state);
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+Recursive initialization routine for DDM solver
+
+INPUT PARAMETERS:
+    Solver      -   solver structure
+    X           -   array[N,NX], dataset points
+    N, NX       -   dataset metrics, N>0, NX>0
+    BFMatrix    -   basis function evaluator
+    LambdaV     -   smoothing parameter
+    SP          -   sparse ACBF preconditioner, (N+NX+1)*(N+NX+1) matrix
+                    stored in CRS format
+    WrkIdx      -   array[], contains indexes of points in the current working
+                    set. Elements [Wrk0,Wrk1) are processed by this function.
+    NNeighbors  -   neighbors count; NNeighbors nearby nodes are added  to
+                    inner points of the chunk
+    NBatch      -   batch size
+    DoDetailedTrace-whether trace output is needed or not. When trace is
+                    activated, solver computes condition numbers. It results
+                    in the several-fold slowdown of the algorithm.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_ddmsolverinitrec(rbf3ddmsolver* solver,
+     /* Real    */ ae_matrix* x,
+     ae_int_t n,
+     ae_int_t nx,
+     rbf3evaluator* bfmatrix,
+     double lambdav,
+     sparsematrix* sp,
+     /* Integer */ ae_vector* wrkidx,
+     ae_int_t wrk0,
+     ae_int_t wrk1,
+     ae_int_t nneighbors,
+     ae_int_t nbatch,
+     ae_bool dodetailedtrace,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    ae_task_group *_child_tasks = NULL;
+    ae_bool _smp_enabled = ae_false;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k0;
+    ae_int_t k1;
+    ae_int_t largestdim;
+    double splitval;
+    double basecasecomplexity;
+    rbf3ddmbuffer *buf;
+    ae_smart_ptr _buf;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&_buf, 0, sizeof(_buf));
+    ae_smart_ptr_init(&_buf, (void**)&buf, _state, ae_true);
+
+    if( wrk1<=wrk0 )
+    {
+        ae_sync(_child_tasks, _smp_enabled, ae_true, _state);
+        ae_frame_leave(_state);
+        return;
+    }
+    basecasecomplexity = rmul3((double)(nbatch+nneighbors+nx+1), (double)(nbatch+nneighbors+nx+1), (double)(nbatch+nneighbors+nx+1), _state);
+    
+    /*
+     * Decide on parallelism
+     */
+    if( (ae_fp_greater_eq(basecasecomplexity*((double)n/(double)nbatch),smpactivationlevel(_state))&&ae_fp_greater_eq((double)n/(double)nbatch,(double)(2)))&&n>=rbfv3_ddmparallelthreshold )
+    {
+        if( _trypexec_rbfv3_ddmsolverinitrec(solver,x,n,nx,bfmatrix,lambdav,sp,wrkidx,wrk0,wrk1,nneighbors,nbatch,dodetailedtrace, _state) )
+        {
+            ae_sync(_child_tasks, _smp_enabled, ae_true, _state);
+            ae_frame_leave(_state);
+            return;
+        }
+    }
+    
+    /*
+     * Retrieve temporary buffer
+     */
+    ae_shared_pool_retrieve(&solver->bufferpool, &_buf, _state);
+    
+    /*
+     * Analyze current working set
+     */
+    rallocv(nx, &buf->tmpboxmin, _state);
+    rallocv(nx, &buf->tmpboxmax, _state);
+    rcopyrv(nx, x, wrkidx->ptr.p_int[wrk0], &buf->tmpboxmin, _state);
+    rcopyrv(nx, x, wrkidx->ptr.p_int[wrk0], &buf->tmpboxmax, _state);
+    for(i=wrk0+1; i<=wrk1-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            buf->tmpboxmin.ptr.p_double[j] = ae_minreal(buf->tmpboxmin.ptr.p_double[j], x->ptr.pp_double[wrkidx->ptr.p_int[i]][j], _state);
+            buf->tmpboxmax.ptr.p_double[j] = ae_maxreal(buf->tmpboxmax.ptr.p_double[j], x->ptr.pp_double[wrkidx->ptr.p_int[i]][j], _state);
+        }
+    }
+    largestdim = 0;
+    for(j=1; j<=nx-1; j++)
+    {
+        if( ae_fp_greater(buf->tmpboxmax.ptr.p_double[j]-buf->tmpboxmin.ptr.p_double[j],buf->tmpboxmax.ptr.p_double[largestdim]-buf->tmpboxmin.ptr.p_double[largestdim]) )
+        {
+            largestdim = j;
+        }
+    }
+    
+    /*
+     * Perform either batch processing or recursive split
+     */
+    if( wrk1-wrk0<=nbatch||ae_fp_eq(buf->tmpboxmax.ptr.p_double[largestdim],buf->tmpboxmin.ptr.p_double[largestdim]) )
+    {
+        
+        /*
+         * Either working set size is small enough or all points are non-distinct.
+         * Stop recursive subdivision.
+         */
+        rbfv3_ddmsolverinitbasecase(solver, x, n, nx, bfmatrix, lambdav, sp, buf, wrkidx, wrk0, wrk1, nneighbors, dodetailedtrace, _state);
+        
+        /*
+         * Recycle temporary buffers
+         */
+        ae_shared_pool_recycle(&solver->bufferpool, &_buf, _state);
+    }
+    else
+    {
+        
+        /*
+         * Compute recursive split along largest axis
+         */
+        splitval = 0.5*(buf->tmpboxmax.ptr.p_double[largestdim]+buf->tmpboxmin.ptr.p_double[largestdim]);
+        k0 = wrk0;
+        k1 = wrk1-1;
+        while(k0<=k1)
+        {
+            if( ae_fp_less_eq(x->ptr.pp_double[wrkidx->ptr.p_int[k0]][largestdim],splitval) )
+            {
+                k0 = k0+1;
+                continue;
+            }
+            if( ae_fp_greater(x->ptr.pp_double[wrkidx->ptr.p_int[k1]][largestdim],splitval) )
+            {
+                k1 = k1-1;
+                continue;
+            }
+            swapelementsi(wrkidx, k0, k1, _state);
+            k0 = k0+1;
+            k1 = k1-1;
+        }
+        ae_assert(k0>wrk0&&k1<wrk1-1, "ACBF: integrity check 2843 in the recursive subdivision code failed", _state);
+        ae_assert(k0==k1+1, "ACBF: integrity check 8364 in the recursive subdivision code failed", _state);
+        
+        /*
+         * Recycle temporary buffer, perform recursive calls
+         */
+        ae_shared_pool_recycle(&solver->bufferpool, &_buf, _state);
+        ae_set_smp_support(&_child_tasks, &_smp_enabled, ae_fp_greater_eq(ae_minreal((double)(k0-wrk0), (double)(wrk1-k0), _state)*basecasecomplexity,spawnlevel(_state)), _state);
+        _spawn_rbfv3_ddmsolverinitrec(solver, x, n, nx, bfmatrix, lambdav, sp, wrkidx, wrk0, k0, nneighbors, nbatch, dodetailedtrace, _child_tasks, _smp_enabled, _state);
+        rbfv3_ddmsolverinitrec(solver, x, n, nx, bfmatrix, lambdav, sp, wrkidx, k0, wrk1, nneighbors, nbatch, dodetailedtrace, _state);
+        ae_sync(_child_tasks, _smp_enabled, ae_false, _state);
+    }
+    ae_sync(_child_tasks, _smp_enabled, ae_true, _state);
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+When called in the multithreaded mode (non-NULL _group), spawns child task.
+Executed serially when called with NULL _group.
+*************************************************************************/
+void _spawn_rbfv3_ddmsolverinitrec(rbf3ddmsolver* solver,
+    /* Real    */ ae_matrix* x,
+    ae_int_t n,
+    ae_int_t nx,
+    rbf3evaluator* bfmatrix,
+    double lambdav,
+    sparsematrix* sp,
+    /* Integer */ ae_vector* wrkidx,
+    ae_int_t wrk0,
+    ae_int_t wrk1,
+    ae_int_t nneighbors,
+    ae_int_t nbatch,
+    ae_bool dodetailedtrace,
+    ae_task_group *_group, ae_bool smp_enabled, ae_state *_state)
+{
+    if( _group==NULL || !smp_enabled)
+    {
+        rbfv3_ddmsolverinitrec(solver,x,n,nx,bfmatrix,lambdav,sp,wrkidx,wrk0,wrk1,nneighbors,nbatch,dodetailedtrace, _state);
+        return;
+    }
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+    {
+        ae_task_info *_task;
+        _task = ae_create_task(_group, _state);
+        _task->data.func = _task_rbfv3_ddmsolverinitrec;
+        _task->data.flags = _state->flags;
+        _task->data.parameters[0].value.val = solver;
+        _task->data.parameters[1].value.val = x;
+        _task->data.parameters[2].value.ival = n;
+        _task->data.parameters[3].value.ival = nx;
+        _task->data.parameters[4].value.val = bfmatrix;
+        _task->data.parameters[5].value.dval = lambdav;
+        _task->data.parameters[6].value.val = sp;
+        _task->data.parameters[7].value.val = wrkidx;
+        _task->data.parameters[8].value.ival = wrk0;
+        _task->data.parameters[9].value.ival = wrk1;
+        _task->data.parameters[10].value.ival = nneighbors;
+        _task->data.parameters[11].value.ival = nbatch;
+        _task->data.parameters[12].value.bval = dodetailedtrace;
+        ae_push_task(_task, _state, ae_false);
+    }
+#else
+    abort(); /* critical integrity failure */
+#endif
+}
+
+
+/*************************************************************************
+This method is called when worker thread starts working on a non-root task.
+*************************************************************************/
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+void _task_rbfv3_ddmsolverinitrec(ae_task_data *_data, ae_state *_state)
+{
+    rbf3ddmsolver* solver;
+    ae_matrix* x;
+    ae_int_t n;
+    ae_int_t nx;
+    rbf3evaluator* bfmatrix;
+    double lambdav;
+    sparsematrix* sp;
+    ae_vector* wrkidx;
+    ae_int_t wrk0;
+    ae_int_t wrk1;
+    ae_int_t nneighbors;
+    ae_int_t nbatch;
+    ae_bool dodetailedtrace;
+    solver = (rbf3ddmsolver*)_data->parameters[0].value.val;
+    x = (ae_matrix*)_data->parameters[1].value.val;
+    n = _data->parameters[2].value.ival;
+    nx = _data->parameters[3].value.ival;
+    bfmatrix = (rbf3evaluator*)_data->parameters[4].value.val;
+    lambdav = _data->parameters[5].value.dval;
+    sp = (sparsematrix*)_data->parameters[6].value.val;
+    wrkidx = (ae_vector*)_data->parameters[7].value.val;
+    wrk0 = _data->parameters[8].value.ival;
+    wrk1 = _data->parameters[9].value.ival;
+    nneighbors = _data->parameters[10].value.ival;
+    nbatch = _data->parameters[11].value.ival;
+    dodetailedtrace = _data->parameters[12].value.bval;
+   ae_state_set_flags(_state, _data->flags);
+   rbfv3_ddmsolverinitrec(solver,x,n,nx,bfmatrix,lambdav,sp,wrkidx,wrk0,wrk1,nneighbors,nbatch,dodetailedtrace, _state);
+}
+#endif
+
+
+/*************************************************************************
+Inserts task as root into worker queue if called from non-worker thread, waits for completion and returns true.
+Returns false if ALGLIB is configured for serial execution or we are already in the worker context.
+*************************************************************************/
+ae_bool _trypexec_rbfv3_ddmsolverinitrec(rbf3ddmsolver* solver,
+    /* Real    */ ae_matrix* x,
+    ae_int_t n,
+    ae_int_t nx,
+    rbf3evaluator* bfmatrix,
+    double lambdav,
+    sparsematrix* sp,
+    /* Integer */ ae_vector* wrkidx,
+    ae_int_t wrk0,
+    ae_int_t wrk1,
+    ae_int_t nneighbors,
+    ae_int_t nbatch,
+    ae_bool dodetailedtrace,
+    ae_state *_state)
+{
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+    ae_task_info *_task;
+    const char *_e;
+    if( !ae_can_pexec(_state) )
+        return ae_false;
+    _task = ae_create_task(NULL, _state);
+    _task->data.func = _task_rbfv3_ddmsolverinitrec;
+    _task->data.flags = _state->flags;
+    _task->data.parameters[0].value.val = solver;
+    _task->data.parameters[1].value.val = x;
+    _task->data.parameters[2].value.ival = n;
+    _task->data.parameters[3].value.ival = nx;
+    _task->data.parameters[4].value.val = bfmatrix;
+    _task->data.parameters[5].value.dval = lambdav;
+    _task->data.parameters[6].value.val = sp;
+    _task->data.parameters[7].value.val = wrkidx;
+    _task->data.parameters[8].value.ival = wrk0;
+    _task->data.parameters[9].value.ival = wrk1;
+    _task->data.parameters[10].value.ival = nneighbors;
+    _task->data.parameters[11].value.ival = nbatch;
+    _task->data.parameters[12].value.bval = dodetailedtrace;
+    ae_push_root_task(_task);
+    ae_wait_for_event(&_task->done_event);
+    _e = _task->exception;
+    ae_dispose_task(_task);
+    ae_assert(_e==NULL, _e, _state);
+    return ae_true;
+#else
+    return ae_false;
+#endif
+}
+
+
+/*************************************************************************
+This function prepares domain decomposition method for  RBF  interpolation
+problem  -  it  partitions  problem  into   subproblems   and  precomputes
+factorizations, and prepares a smaller correction spline that is  used  to
+correct distortions introduced by domain decomposition  and  imperfections
+in approximate cardinal basis.
+
+INPUT PARAMETERS:
+    X           -   array[N,NX], dataset points
+    RescaledBy  -   additional scaling coefficient that was applied to the
+                    dataset by preprocessor. Used ONLY for logging purposes
+                    - without it all distances will be reported  in  [0,1]
+                    scale, not one set by user.
+    N, NX       -   dataset metrics, N>0, NX>0
+    BFMatrix    -   RBF evaluator
+    BFType      -   basis function type
+    BFParam     -   basis function parameter
+    LambdaV     -   regularization parameter, >=0
+    ATerm       -   polynomial term type (1 for linear, 2 for constant, 3 for zero)
+    SP          -   sparse ACBF preconditioner, (N+NX+1)*(N+NX+1) matrix
+                    stored in CRS format
+    NNeighbors  -   neighbors count; NNeighbors nearby nodes are added  to
+                    inner points of the batch
+    NBatch      -   batch size
+    NCorrector  -   nodes count for correction spline
+    DoTrace     -   whether low overhead logging is needed or not
+    DoDetailedTrace-whether detailed trace output is needed or not. When trace is
+                    activated, solver computes condition numbers. It results
+                    in the small slowdown of the algorithm.
+    
+OUTPUT PARAMETERS:
+    Solver      -   DDM solver
+    timeDDMInit-    time used by the DDM part initialization, ms
+    timeCorrInit-   time used by the corrector initialization, ms
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_ddmsolverinit(/* Real    */ ae_matrix* x,
+     double rescaledby,
+     ae_int_t n,
+     ae_int_t nx,
+     rbf3evaluator* bfmatrix,
+     ae_int_t bftype,
+     double bfparam,
+     double lambdav,
+     ae_int_t aterm,
+     sparsematrix* sp,
+     ae_int_t nneighbors,
+     ae_int_t nbatch,
+     ae_int_t ncorrector,
+     ae_bool dotrace,
+     ae_bool dodetailedtrace,
+     rbf3ddmsolver* solver,
+     ae_int_t* timeddminit,
+     ae_int_t* timecorrinit,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    ae_int_t i;
+    ae_int_t j;
+    ae_vector idx;
+    rbf3ddmbuffer bufferseed;
+    rbf3ddmsubproblem subproblem;
+    rbf3ddmsubproblem *p;
+    ae_smart_ptr _p;
+    double correctorgridseparation;
+    ae_matrix corrsys;
+    ae_vector corrtau;
+    ae_vector idummy;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&idx, 0, sizeof(idx));
+    memset(&bufferseed, 0, sizeof(bufferseed));
+    memset(&subproblem, 0, sizeof(subproblem));
+    memset(&_p, 0, sizeof(_p));
+    memset(&corrsys, 0, sizeof(corrsys));
+    memset(&corrtau, 0, sizeof(corrtau));
+    memset(&idummy, 0, sizeof(idummy));
+    *timeddminit = 0;
+    *timecorrinit = 0;
+    ae_vector_init(&idx, 0, DT_INT, _state, ae_true);
+    _rbf3ddmbuffer_init(&bufferseed, _state, ae_true);
+    _rbf3ddmsubproblem_init(&subproblem, _state, ae_true);
+    ae_smart_ptr_init(&_p, (void**)&p, _state, ae_true);
+    ae_matrix_init(&corrsys, 0, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&corrtau, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&idummy, 0, DT_INT, _state, ae_true);
+
+    ae_assert((aterm==1||aterm==2)||aterm==3, "RBF3: integrity check 3320 failed", _state);
+    
+    /*
+     * Start DDM part
+     */
+    *timeddminit = ae_tickcount();
+    
+    /*
+     * Save problem info
+     */
+    solver->lambdav = lambdav;
+    
+    /*
+     * Prepare KD-tree
+     */
+    iallocv(n, &idx, _state);
+    for(i=0; i<=n-1; i++)
+    {
+        idx.ptr.p_int[i] = i;
+    }
+    kdtreebuildtagged(x, &idx, n, nx, 0, 2, &solver->kdt, _state);
+    
+    /*
+     * Prepare temporary buffer pool
+     */
+    bsetallocv(n+nx+1, ae_false, &bufferseed.bflags, _state);
+    iallocv(n+nx+1, &bufferseed.idx2preccol, _state);
+    rallocv(nx, &bufferseed.tmpboxmin, _state);
+    rallocv(nx, &bufferseed.tmpboxmax, _state);
+    kdtreecreaterequestbuffer(&solver->kdt, &bufferseed.kdtbuf, _state);
+    ae_shared_pool_set_seed(&solver->bufferpool, &bufferseed, sizeof(bufferseed), _rbf3ddmbuffer_init, _rbf3ddmbuffer_init_copy, _rbf3ddmbuffer_destroy, _state);
+    
+    /*
+     * Prepare default subproblems buffer, run recursive procedure
+     * and count subproblems in the buffer
+     */
+    subproblem.isvalid = ae_false;
+    ae_shared_pool_set_seed(&solver->subproblemspool, &subproblem, sizeof(subproblem), _rbf3ddmsubproblem_init, _rbf3ddmsubproblem_init_copy, _rbf3ddmsubproblem_destroy, _state);
+    ae_shared_pool_set_seed(&solver->subproblemsbuffer, &subproblem, sizeof(subproblem), _rbf3ddmsubproblem_init, _rbf3ddmsubproblem_init_copy, _rbf3ddmsubproblem_destroy, _state);
+    rbfv3_ddmsolverinitrec(solver, x, n, nx, bfmatrix, solver->lambdav, sp, &idx, 0, n, nneighbors, nbatch, dodetailedtrace, _state);
+    solver->subproblemscnt = 0;
+    solver->cntlu = 0;
+    solver->cntregqr = 0;
+    ae_shared_pool_first_recycled(&solver->subproblemspool, &_p, _state);
+    while(p!=NULL)
+    {
+        solver->subproblemscnt = solver->subproblemscnt+1;
+        if( p->decomposition==0 )
+        {
+            inc(&solver->cntlu, _state);
+        }
+        if( p->decomposition==1 )
+        {
+            inc(&solver->cntregqr, _state);
+        }
+        ae_shared_pool_next_recycled(&solver->subproblemspool, &_p, _state);
+    }
+    ae_assert(solver->cntlu+solver->cntregqr==solver->subproblemscnt, "RBFV3: integrity check 5296 failed", _state);
+    ae_assert(solver->subproblemscnt>0, "RBFV3: subproblems pool is empty, critical integrity check failed", _state);
+    
+    /*
+     * DDM part is done
+     */
+    *timeddminit = ae_tickcount()-(*timeddminit);
+    if( dotrace )
+    {
+        ae_trace("> DDM part was prepared in %0d ms, %0d subproblems solved (%0d well-conditioned, %0d ill-conditioned)\n",
+            (int)(*timeddminit),
+            (int)(solver->subproblemscnt),
+            (int)(solver->cntlu),
+            (int)(solver->cntregqr));
+    }
+    
+    /*
+     * Prepare correction spline
+     */
+    *timecorrinit = ae_tickcount();
+    rbfv3_selectglobalnodes(x, n, nx, &idummy, 0, ncorrector, &solver->corrnodes, &solver->ncorrector, &correctorgridseparation, _state);
+    ncorrector = solver->ncorrector;
+    ae_assert(ncorrector>0, "RBFV3: NCorrector=0", _state);
+    rsetallocm(ncorrector+nx+1, ncorrector+nx+1, 0.0, &corrsys, _state);
+    rallocm(ncorrector, nx, &solver->corrx, _state);
+    for(i=0; i<=ncorrector-1; i++)
+    {
+        rcopyrr(nx, x, solver->corrnodes.ptr.p_int[i], &solver->corrx, i, _state);
+    }
+    rbfv3_computebfmatrix(&solver->corrx, ncorrector, nx, bftype, bfparam, &corrsys, _state);
+    if( aterm==1 )
+    {
+        
+        /*
+         * Use linear term
+         */
+        for(i=0; i<=nx-1; i++)
+        {
+            for(j=0; j<=ncorrector-1; j++)
+            {
+                corrsys.ptr.pp_double[ncorrector+i][j] = x->ptr.pp_double[solver->corrnodes.ptr.p_int[j]][i];
+                corrsys.ptr.pp_double[j][ncorrector+i] = x->ptr.pp_double[solver->corrnodes.ptr.p_int[j]][i];
+            }
+        }
+        for(j=0; j<=ncorrector-1; j++)
+        {
+            corrsys.ptr.pp_double[ncorrector+nx][j] = 1.0;
+            corrsys.ptr.pp_double[j][ncorrector+nx] = 1.0;
+        }
+    }
+    if( aterm==2 )
+    {
+        
+        /*
+         * Use constant term
+         */
+        for(i=0; i<=nx-1; i++)
+        {
+            corrsys.ptr.pp_double[ncorrector+i][ncorrector+i] = 1.0;
+        }
+        for(j=0; j<=ncorrector-1; j++)
+        {
+            corrsys.ptr.pp_double[ncorrector+nx][j] = 1.0;
+            corrsys.ptr.pp_double[j][ncorrector+nx] = 1.0;
+        }
+    }
+    if( aterm==3 )
+    {
+        
+        /*
+         * Use zero term
+         */
+        for(i=0; i<=nx; i++)
+        {
+            corrsys.ptr.pp_double[ncorrector+i][ncorrector+i] = 1.0;
+        }
+    }
+    for(j=0; j<=ncorrector-1; j++)
+    {
+        corrsys.ptr.pp_double[j][j] = corrsys.ptr.pp_double[j][j]+solver->lambdav;
+    }
+    rmatrixqr(&corrsys, ncorrector+nx+1, ncorrector+nx+1, &corrtau, _state);
+    rmatrixqrunpackq(&corrsys, ncorrector+nx+1, ncorrector+nx+1, &corrtau, ncorrector+nx+1, &solver->corrq, _state);
+    rmatrixqrunpackr(&corrsys, ncorrector+nx+1, ncorrector+nx+1, &solver->corrr, _state);
+    *timecorrinit = ae_tickcount()-(*timecorrinit);
+    if( dotrace )
+    {
+        ae_trace("> Corrector spline was prepared in %0d ms (%0d nodes, max distance from dataset points to nearest grid node is %0.2e)\n",
+            (int)(*timecorrinit),
+            (int)(ncorrector),
+            (double)(correctorgridseparation*rescaledby));
+    }
+    if( dodetailedtrace )
+    {
+        ae_trace("> printing condition numbers for correction spline:\n");
+        ae_trace("cond(A)     = %0.2e (Linf norm, leading NCoarsexNCoarse block)\n",
+            (double)(1/(rmatrixtrrcondinf(&solver->corrr, ncorrector, ae_true, ae_false, _state)+ae_machineepsilon)));
+        ae_trace("cond(A)     = %0.2e (Linf norm, full system)\n",
+            (double)(1/(rmatrixtrrcondinf(&solver->corrr, ncorrector+nx+1, ae_true, ae_false, _state)+ae_machineepsilon)));
+    }
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+Recursive subroutine for DDM method. Given initial subproblems count  Cnt,
+it perform two recursive calls (spawns children in parallel when possible)
+with Cnt~Cnt/2 until we end up with Cnt=1.
+
+Case with Cnt=1 is handled by retrieving subproblem from Solver.SubproblemsPool,
+solving it and pushing subproblem to Solver.SubproblemsBuffer.
+
+INPUT PARAMETERS:
+    Solver      -   DDM solver object
+    Res         -   array[N,NY], current residuals
+    N, NX, NY   -   dataset metrics, N>0, NX>0, NY>0
+    C           -   preallocated array[N+NX+1,NY]
+    Cnt         -   number of subproblems to process
+    
+OUTPUT PARAMETERS:
+    C           -   rows 0..N-1  contain spline coefficients
+                    rows N..N+NX are filled by zeros
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_ddmsolverrunrec(rbf3ddmsolver* solver,
+     /* Real    */ ae_matrix* res,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_int_t ny,
+     /* Real    */ ae_matrix* c,
+     ae_int_t cnt,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    ae_int_t nwrk;
+    ae_int_t ntarget;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    double v;
+    rbf3ddmsubproblem *subproblem;
+    ae_smart_ptr _subproblem;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&_subproblem, 0, sizeof(_subproblem));
+    ae_smart_ptr_init(&_subproblem, (void**)&subproblem, _state, ae_true);
+
+    
+    /*
+     * Run recursive procedure if needed
+     */
+    if( cnt>1 )
+    {
+        k = cnt/2;
+        ae_assert(k<=cnt-k, "RBFV3: integrity check 2733 failed", _state);
+        rbfv3_ddmsolverrunrec(solver, res, n, nx, ny, c, cnt-k, _state);
+        rbfv3_ddmsolverrunrec(solver, res, n, nx, ny, c, k, _state);
+        ae_frame_leave(_state);
+        return;
+    }
+    
+    /*
+     * Retrieve subproblem from the source pool, solve it
+     */
+    ae_shared_pool_retrieve(&solver->subproblemspool, &_subproblem, _state);
+    ae_assert(subproblem!=NULL&&subproblem->isvalid, "RBFV3: integrity check 1742 failed", _state);
+    nwrk = subproblem->nwork;
+    ntarget = subproblem->ntarget;
+    if( subproblem->decomposition==0 )
+    {
+        
+        /*
+         * Solve using LU decomposition (the fastest option)
+         */
+        rallocm(nwrk, ny, &subproblem->rhs, _state);
+        for(i=0; i<=nwrk-1; i++)
+        {
+            for(j=0; j<=ny-1; j++)
+            {
+                subproblem->rhs.ptr.pp_double[i][j] = res->ptr.pp_double[subproblem->workingnodes.ptr.p_int[i]][j];
+            }
+        }
+        for(i=0; i<=nwrk-1; i++)
+        {
+            if( subproblem->wrkp.ptr.p_int[i]!=i )
+            {
+                for(j=0; j<=ny-1; j++)
+                {
+                    v = subproblem->rhs.ptr.pp_double[i][j];
+                    subproblem->rhs.ptr.pp_double[i][j] = subproblem->rhs.ptr.pp_double[subproblem->wrkp.ptr.p_int[i]][j];
+                    subproblem->rhs.ptr.pp_double[subproblem->wrkp.ptr.p_int[i]][j] = v;
+                }
+            }
+        }
+        rmatrixlefttrsm(nwrk, ny, &subproblem->wrklu, 0, 0, ae_false, ae_true, 0, &subproblem->rhs, 0, 0, _state);
+        rmatrixlefttrsm(nwrk, ny, &subproblem->wrklu, 0, 0, ae_true, ae_false, 0, &subproblem->rhs, 0, 0, _state);
+        rcopyallocm(nwrk, ny, &subproblem->rhs, &subproblem->sol, _state);
+    }
+    else
+    {
+        
+        /*
+         * Solve using regularized QR (well, we tried LU but it failed)
+         */
+        ae_assert(subproblem->decomposition==1, "RBFV3: integrity check 1743 failed", _state);
+        rallocm(nwrk, ny, &subproblem->rhs, _state);
+        for(i=0; i<=nwrk-1; i++)
+        {
+            for(j=0; j<=ny-1; j++)
+            {
+                subproblem->rhs.ptr.pp_double[i][j] = res->ptr.pp_double[subproblem->workingnodes.ptr.p_int[i]][j];
+            }
+        }
+        rallocm(nwrk, ny, &subproblem->qtrhs, _state);
+        rmatrixgemm(nwrk, ny, nwrk, 1.0, &subproblem->wrkq, 0, 0, 1, &subproblem->rhs, 0, 0, 0, 0.0, &subproblem->qtrhs, 0, 0, _state);
+        rmatrixlefttrsm(nwrk, ny, &subproblem->wrkr, 0, 0, ae_true, ae_false, 0, &subproblem->qtrhs, 0, 0, _state);
+        rcopyallocm(nwrk, ny, &subproblem->qtrhs, &subproblem->sol, _state);
+    }
+    for(i=0; i<=ntarget-1; i++)
+    {
+        for(j=0; j<=ny-1; j++)
+        {
+            c->ptr.pp_double[subproblem->targetnodes.ptr.p_int[i]][j] = subproblem->sol.ptr.pp_double[i][j];
+        }
+    }
+    
+    /*
+     * Push to the destination pool
+     */
+    ae_shared_pool_recycle(&solver->subproblemsbuffer, &_subproblem, _state);
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+This function APPROXIMATELY solves RBF interpolation problem using  domain
+decomposition method. Given current residuals Res, it computes approximate
+basis function coefficients C (but does  NOT  compute linear  coefficients
+- these are set to zero).
+
+This function is a linear operator with respect to its input RES, thus  it
+can be used as a preconditioner for an iterative linear solver like GMRES.
+
+INPUT PARAMETERS:
+    Solver      -   DDM solver object
+    Res         -   array[N,NY], current residuals
+    N, NX, NY   -   dataset metrics, N>0, NX>0, NY>0
+    SP          -   preconditioner, (N+NX+1)*(N+NX+1) sparse matrix
+    BFMatrix    -   basis functions evaluator
+    C           -   preallocated array[N+NX+1,NY]
+    timeDDMSolve,
+    timeCorrSolve-  on input contain already accumulated timings
+                    for DDM and CORR parts
+    
+OUTPUT PARAMETERS:
+    C           -   rows 0..N-1  contain spline coefficients
+                    rows N..N+NX are filled by zeros
+    timeDDMSolve,
+    timeCorrSolve-  updated with new timings
+    
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_ddmsolverrun(rbf3ddmsolver* solver,
+     /* Real    */ ae_matrix* res,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_int_t ny,
+     sparsematrix* sp,
+     rbf3evaluator* bfmatrix,
+     /* Real    */ ae_matrix* upd,
+     ae_int_t* timeddmsolve,
+     ae_int_t* timecorrsolve,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    rbf3ddmsubproblem *subproblem;
+    ae_smart_ptr _subproblem;
+    ae_matrix c;
+    ae_vector x0;
+    ae_vector x1;
+    ae_vector refrhs1;
+    ae_matrix updt;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&_subproblem, 0, sizeof(_subproblem));
+    memset(&c, 0, sizeof(c));
+    memset(&x0, 0, sizeof(x0));
+    memset(&x1, 0, sizeof(x1));
+    memset(&refrhs1, 0, sizeof(refrhs1));
+    memset(&updt, 0, sizeof(updt));
+    ae_smart_ptr_init(&_subproblem, (void**)&subproblem, _state, ae_true);
+    ae_matrix_init(&c, 0, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&x0, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&x1, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&refrhs1, 0, DT_REAL, _state, ae_true);
+    ae_matrix_init(&updt, 0, 0, DT_REAL, _state, ae_true);
+
+    rsetallocm(ny, n+nx+1, 0.0, &updt, _state);
+    rsetallocm(n+nx+1, ny, 0.0, &c, _state);
+    for(j=0; j<=ny-1; j++)
+    {
+        for(i=n; i<=n+nx; i++)
+        {
+            c.ptr.pp_double[i][j] = (double)(0);
+        }
+    }
+    
+    /*
+     * Solve DDM part:
+     * * run recursive procedure that computes DDM part.
+     * * clean-up: move processed subproblems from Solver.SubproblemsBuffer back to Solver.SubproblemsPool
+     * * multiply solution by the preconditioner matrix
+     */
+    *timeddmsolve = *timeddmsolve-ae_tickcount();
+    rbfv3_ddmsolverrunrec(solver, res, n, nx, ny, &c, solver->subproblemscnt, _state);
+    for(i=0; i<=solver->subproblemscnt-1; i++)
+    {
+        ae_shared_pool_retrieve(&solver->subproblemsbuffer, &_subproblem, _state);
+        ae_assert(subproblem!=NULL&&subproblem->isvalid, "RBFV3: integrity check 5223 failed", _state);
+        ae_shared_pool_recycle(&solver->subproblemspool, &_subproblem, _state);
+    }
+    *timeddmsolve = *timeddmsolve+ae_tickcount();
+    rallocv(n+nx+1, &x0, _state);
+    rallocv(n+nx+1, &x1, _state);
+    for(j=0; j<=ny-1; j++)
+    {
+        rcopycv(n+nx+1, &c, j, &x0, _state);
+        sparsegemv(sp, 1.0, 1, &x0, 0, 0.0, &x1, 0, _state);
+        rcopyvr(n+nx+1, &x1, &updt, j, _state);
+    }
+    
+    /*
+     * Compute correction spline that fixes oscillations introduced by the DDM part
+     */
+    *timecorrsolve = *timecorrsolve-ae_tickcount();
+    rallocv(solver->ncorrector+nx+1, &x0, _state);
+    rallocv(n+nx+1, &x1, _state);
+    for(j=0; j<=ny-1; j++)
+    {
+        
+        /*
+         * Prepare right-hand side for the QR solver
+         */
+        rsetallocv(solver->ncorrector+nx+1, 0.0, &refrhs1, _state);
+        rcopyrv(n+nx+1, &updt, j, &x1, _state);
+        rbfv3_modelmatrixcomputeproductatnodes(bfmatrix, &x1, &solver->corrnodes, solver->ncorrector, &refrhs1, _state);
+        for(i=0; i<=solver->ncorrector-1; i++)
+        {
+            refrhs1.ptr.p_double[i] = res->ptr.pp_double[solver->corrnodes.ptr.p_int[i]][j]-refrhs1.ptr.p_double[i];
+            for(k=0; k<=nx-1; k++)
+            {
+                refrhs1.ptr.p_double[i] = refrhs1.ptr.p_double[i]-solver->corrx.ptr.pp_double[i][k]*x1.ptr.p_double[n+k];
+            }
+            refrhs1.ptr.p_double[i] = refrhs1.ptr.p_double[i]-x1.ptr.p_double[n+nx];
+            refrhs1.ptr.p_double[i] = refrhs1.ptr.p_double[i]-solver->lambdav*x1.ptr.p_double[solver->corrnodes.ptr.p_int[i]];
+        }
+        
+        /*
+         * Solve QR-factorized system
+         */
+        rgemv(solver->ncorrector+nx+1, solver->ncorrector+nx+1, 1.0, &solver->corrq, 1, &refrhs1, 0.0, &x0, _state);
+        rmatrixtrsv(solver->ncorrector+nx+1, &solver->corrr, 0, 0, ae_true, ae_false, 0, &x0, 0, _state);
+        for(i=0; i<=solver->ncorrector-1; i++)
+        {
+            updt.ptr.pp_double[j][solver->corrnodes.ptr.p_int[i]] = updt.ptr.pp_double[j][solver->corrnodes.ptr.p_int[i]]+x0.ptr.p_double[i];
+        }
+        for(i=0; i<=nx; i++)
+        {
+            updt.ptr.pp_double[j][n+i] = updt.ptr.pp_double[j][n+i]+x0.ptr.p_double[solver->ncorrector+i];
+        }
+    }
+    *timecorrsolve = *timecorrsolve+ae_tickcount();
+    rallocm(n+nx+1, ny, upd, _state);
+    rmatrixtranspose(ny, n+nx+1, &updt, 0, 0, upd, 0, 0, _state);
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+This function is a specialized version of DDMSolverRun() for NY=1.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_ddmsolverrun1(rbf3ddmsolver* solver,
+     /* Real    */ ae_vector* res,
+     ae_int_t n,
+     ae_int_t nx,
+     sparsematrix* sp,
+     rbf3evaluator* bfmatrix,
+     /* Real    */ ae_vector* upd,
+     ae_int_t* timeddmsolve,
+     ae_int_t* timecorrsolve,
+     ae_state *_state)
+{
+
+
+    rallocm(n, 1, &solver->tmpres1, _state);
+    rcopyvc(n, res, &solver->tmpres1, 0, _state);
+    rbfv3_ddmsolverrun(solver, &solver->tmpres1, n, nx, 1, sp, bfmatrix, &solver->tmpupd1, timeddmsolve, timecorrsolve, _state);
+    rallocv(n+nx+1, upd, _state);
+    rcopycv(n+nx+1, &solver->tmpupd1, 0, upd, _state);
+}
+
+
+/*************************************************************************
+Automatically detect scale parameter as a mean distance towards nearest
+neighbor (not counting nearest neighbors that are too close)
+
+PARAMETERS:
+    XX                  -   dataset (X-values), array[N,NX]
+    N                   -   points count, N>=1
+    NX                  -   dimensions count, NX>=1
+    
+RESULT:
+    suggested scale
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static double rbfv3_autodetectscaleparameter(/* Real    */ ae_matrix* xx,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t nq;
+    ae_int_t nlocal;
+    kdtree kdt;
+    ae_vector x;
+    ae_vector d;
+    double result;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&kdt, 0, sizeof(kdt));
+    memset(&x, 0, sizeof(x));
+    memset(&d, 0, sizeof(d));
+    _kdtree_init(&kdt, _state, ae_true);
+    ae_vector_init(&x, 0, DT_REAL, _state, ae_true);
+    ae_vector_init(&d, 0, DT_REAL, _state, ae_true);
+
+    ae_assert(n>=1, "RBFV3: integrity check 7624 failed", _state);
+    rallocv(nx, &x, _state);
+    kdtreebuild(xx, n, nx, 0, 2, &kdt, _state);
+    nlocal = ae_round(ae_pow((double)(2), (double)(nx), _state)+1, _state);
+    result = (double)(0);
+    for(i=0; i<=n-1; i++)
+    {
+        
+        /*
+         * Query a batch of nearest neighbors
+         */
+        rcopyrv(nx, xx, i, &x, _state);
+        nq = kdtreequeryknn(&kdt, &x, nlocal, ae_true, _state);
+        ae_assert(nq>=1, "RBFV3: integrity check 7625 failed", _state);
+        kdtreequeryresultsdistances(&kdt, &d, _state);
+        
+        /*
+         * In order to filter out nearest neighbors that are too close,
+         * we use distance R toward most distant of NQ nearest neighbors as
+         * a reference and select nearest neighbor with distance >=0.5*R/NQ
+         */
+        for(j=0; j<=nq-1; j++)
+        {
+            if( ae_fp_greater_eq(d.ptr.p_double[j],0.5*d.ptr.p_double[nq-1]/nq) )
+            {
+                result = result+d.ptr.p_double[j];
+                break;
+            }
+        }
+    }
+    result = result/n;
+    ae_frame_leave(_state);
+    return result;
+}
+
+
+/*************************************************************************
+Recursive functions matrix computation
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_computebfmatrixrec(/* Real    */ ae_matrix* xx,
+     ae_int_t range0,
+     ae_int_t range1,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_int_t functype,
+     double funcparam,
+     /* Real    */ ae_matrix* f,
+     ae_state *_state)
+{
+    ae_task_group *_child_tasks = NULL;
+    ae_bool _smp_enabled = ae_false;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    double v;
+    double vv;
+    double elemcost;
+    double alpha2;
+
+
+    ae_assert((functype==1||functype==2)||functype==3, "RBFV3.ComputeTransposedDesignSystem: unexpected FuncType", _state);
+    
+    /*
+     * Try to parallelize
+     */
+    elemcost = 10.0;
+    if( ((range0==0&&range1==n)&&ae_fp_greater_eq(0.5*rmul3((double)(n), (double)(n), elemcost, _state),smpactivationlevel(_state)))&&n>=rbfv3_bfparallelthreshold )
+    {
+        if( _trypexec_rbfv3_computebfmatrixrec(xx,range0,range1,n,nx,functype,funcparam,f, _state) )
+        {
+            ae_sync(_child_tasks, _smp_enabled, ae_true, _state);
+            return;
+        }
+    }
+    
+    /*
+     * Try recursive splits
+     */
+    if( range1-range0>16 )
+    {
+        k = range0+(range1-range0)/2;
+        ae_set_smp_support(&_child_tasks, &_smp_enabled, ae_fp_greater_eq(rmul3((double)(range1-range0), (double)(n-k), elemcost, _state),spawnlevel(_state)), _state);
+        _spawn_rbfv3_computebfmatrixrec(xx, range0, k, n, nx, functype, funcparam, f, _child_tasks, _smp_enabled, _state);
+        rbfv3_computebfmatrixrec(xx, k, range1, n, nx, functype, funcparam, f, _state);
+        ae_sync(_child_tasks, _smp_enabled, ae_true, _state);
+        return;
+    }
+    
+    /*
+     * Serial processing
+     */
+    alpha2 = funcparam*funcparam;
+    for(i=range0; i<=range1-1; i++)
+    {
+        for(j=i; j<=n-1; j++)
+        {
+            v = (double)(0);
+            for(k=0; k<=nx-1; k++)
+            {
+                vv = xx->ptr.pp_double[i][k]-xx->ptr.pp_double[j][k];
+                v = v+vv*vv;
+            }
+            if( functype==1 )
+            {
+                v = -ae_sqrt(v+alpha2, _state);
+            }
+            if( functype==2 )
+            {
+                if( v!=0.0 )
+                {
+                    v = v*0.5*ae_log(v, _state);
+                }
+                else
+                {
+                    v = 0.0;
+                }
+            }
+            if( functype==3 )
+            {
+                v = v*ae_sqrt(v, _state);
+            }
+            f->ptr.pp_double[i][j] = v;
+            f->ptr.pp_double[j][i] = v;
+        }
+    }
+    ae_sync(_child_tasks, _smp_enabled, ae_true, _state);
+}
+
+
+/*************************************************************************
+When called in the multithreaded mode (non-NULL _group), spawns child task.
+Executed serially when called with NULL _group.
+*************************************************************************/
+void _spawn_rbfv3_computebfmatrixrec(/* Real    */ ae_matrix* xx,
+    ae_int_t range0,
+    ae_int_t range1,
+    ae_int_t n,
+    ae_int_t nx,
+    ae_int_t functype,
+    double funcparam,
+    /* Real    */ ae_matrix* f,
+    ae_task_group *_group, ae_bool smp_enabled, ae_state *_state)
+{
+    if( _group==NULL || !smp_enabled)
+    {
+        rbfv3_computebfmatrixrec(xx,range0,range1,n,nx,functype,funcparam,f, _state);
+        return;
+    }
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+    {
+        ae_task_info *_task;
+        _task = ae_create_task(_group, _state);
+        _task->data.func = _task_rbfv3_computebfmatrixrec;
+        _task->data.flags = _state->flags;
+        _task->data.parameters[0].value.val = xx;
+        _task->data.parameters[1].value.ival = range0;
+        _task->data.parameters[2].value.ival = range1;
+        _task->data.parameters[3].value.ival = n;
+        _task->data.parameters[4].value.ival = nx;
+        _task->data.parameters[5].value.ival = functype;
+        _task->data.parameters[6].value.dval = funcparam;
+        _task->data.parameters[7].value.val = f;
+        ae_push_task(_task, _state, ae_false);
+    }
+#else
+    abort(); /* critical integrity failure */
+#endif
+}
+
+
+/*************************************************************************
+This method is called when worker thread starts working on a non-root task.
+*************************************************************************/
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+void _task_rbfv3_computebfmatrixrec(ae_task_data *_data, ae_state *_state)
+{
+    ae_matrix* xx;
+    ae_int_t range0;
+    ae_int_t range1;
+    ae_int_t n;
+    ae_int_t nx;
+    ae_int_t functype;
+    double funcparam;
+    ae_matrix* f;
+    xx = (ae_matrix*)_data->parameters[0].value.val;
+    range0 = _data->parameters[1].value.ival;
+    range1 = _data->parameters[2].value.ival;
+    n = _data->parameters[3].value.ival;
+    nx = _data->parameters[4].value.ival;
+    functype = _data->parameters[5].value.ival;
+    funcparam = _data->parameters[6].value.dval;
+    f = (ae_matrix*)_data->parameters[7].value.val;
+   ae_state_set_flags(_state, _data->flags);
+   rbfv3_computebfmatrixrec(xx,range0,range1,n,nx,functype,funcparam,f, _state);
+}
+#endif
+
+
+/*************************************************************************
+Inserts task as root into worker queue if called from non-worker thread, waits for completion and returns true.
+Returns false if ALGLIB is configured for serial execution or we are already in the worker context.
+*************************************************************************/
+ae_bool _trypexec_rbfv3_computebfmatrixrec(/* Real    */ ae_matrix* xx,
+    ae_int_t range0,
+    ae_int_t range1,
+    ae_int_t n,
+    ae_int_t nx,
+    ae_int_t functype,
+    double funcparam,
+    /* Real    */ ae_matrix* f,
+    ae_state *_state)
+{
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+    ae_task_info *_task;
+    const char *_e;
+    if( !ae_can_pexec(_state) )
+        return ae_false;
+    _task = ae_create_task(NULL, _state);
+    _task->data.func = _task_rbfv3_computebfmatrixrec;
+    _task->data.flags = _state->flags;
+    _task->data.parameters[0].value.val = xx;
+    _task->data.parameters[1].value.ival = range0;
+    _task->data.parameters[2].value.ival = range1;
+    _task->data.parameters[3].value.ival = n;
+    _task->data.parameters[4].value.ival = nx;
+    _task->data.parameters[5].value.ival = functype;
+    _task->data.parameters[6].value.dval = funcparam;
+    _task->data.parameters[7].value.val = f;
+    ae_push_root_task(_task);
+    ae_wait_for_event(&_task->done_event);
+    _e = _task->exception;
+    ae_dispose_task(_task);
+    ae_assert(_e==NULL, _e, _state);
+    return ae_true;
+#else
+    return ae_false;
+#endif
+}
+
+
+/*************************************************************************
+This function computes  basis  functions  matrix  (both  upper  and  lower
+triangles)
+
+
+      [ f(dist(x0,x0))     ... f(dist(x0,x(n-1)))     ]
+      [ f(dist(x1,x0))     ... f(dist(x1,x(n-1)))     ]
+      [ ............................................. ]
+      [ f(dist(x(n-1),x0)) ... f(dist(x(n-1),x(n-1))) ]
+      
+NOTE: if F is large enough to store result, it is not reallocated. Values
+      outside of [0,N)x[0,N) range are not modified.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_computebfmatrix(/* Real    */ ae_matrix* xx,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_int_t functype,
+     double funcparam,
+     /* Real    */ ae_matrix* f,
+     ae_state *_state)
+{
+
+
+    rallocm(n, n, f, _state);
+    rbfv3_computebfmatrixrec(xx, 0, n, n, nx, functype, funcparam, f, _state);
+}
+
+
+/*************************************************************************
+Initializes model matrix using specified matrix storage format:
+* StorageType=0     a N*N matrix of basis function values is stored 
+* StorageType=1     basis function values are recomputed on demand
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_modelmatrixinit(/* Real    */ ae_matrix* xx,
+     ae_int_t n,
+     ae_int_t nx,
+     ae_int_t functype,
+     double funcparam,
+     ae_int_t storagetype,
+     rbf3evaluator* modelmatrix,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    ae_int_t nchunks;
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t srcoffs;
+    ae_int_t dstoffs;
+    ae_int_t curlen;
+    rbf3evaluatorbuffer bufseed;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&bufseed, 0, sizeof(bufseed));
+    _rbf3evaluator_clear(modelmatrix);
+    _rbf3evaluatorbuffer_init(&bufseed, _state, ae_true);
+
+    ae_assert(storagetype==0||storagetype==1, "RBFV3: unexpected StorageType for ModelMatrixInit()", _state);
+    modelmatrix->n = n;
+    modelmatrix->storagetype = storagetype;
+    if( storagetype==0 )
+    {
+        rbfv3_computebfmatrix(xx, n, nx, functype, funcparam, &modelmatrix->f, _state);
+        ae_frame_leave(_state);
+        return;
+    }
+    if( storagetype==1 )
+    {
+        
+        /*
+         * Save model parameters
+         */
+        modelmatrix->nx = nx;
+        modelmatrix->functype = functype;
+        modelmatrix->funcparam = funcparam;
+        modelmatrix->chunksize = 128;
+        
+        /*
+         * Prepare temporary buffers
+         */
+        ae_shared_pool_set_seed(&modelmatrix->bufferpool, &bufseed, sizeof(bufseed), _rbf3evaluatorbuffer_init, _rbf3evaluatorbuffer_init_copy, _rbf3evaluatorbuffer_destroy, _state);
+        rsetallocv(modelmatrix->chunksize, 1.0, &modelmatrix->chunk1, _state);
+        
+        /*
+         * Store dataset in the chunked row storage format (rows with size at most ChunkSize, one row per dimension/chunk)
+         */
+        iallocv(n, &modelmatrix->entireset, _state);
+        for(i=0; i<=n-1; i++)
+        {
+            modelmatrix->entireset.ptr.p_int[i] = i;
+        }
+        rcopyallocm(n, nx, xx, &modelmatrix->x, _state);
+        nchunks = idivup(n, modelmatrix->chunksize, _state);
+        rsetallocm(nchunks*nx, modelmatrix->chunksize, 0.0, &modelmatrix->xtchunked, _state);
+        srcoffs = 0;
+        dstoffs = 0;
+        while(srcoffs<n)
+        {
+            curlen = ae_minint(modelmatrix->chunksize, n-srcoffs, _state);
+            for(i=0; i<=curlen-1; i++)
+            {
+                for(j=0; j<=nx-1; j++)
+                {
+                    modelmatrix->xtchunked.ptr.pp_double[dstoffs+j][i] = xx->ptr.pp_double[srcoffs+i][j];
+                }
+            }
+            srcoffs = srcoffs+curlen;
+            dstoffs = dstoffs+nx;
+        }
+        ae_frame_leave(_state);
+        return;
+    }
+    ae_assert(ae_false, "ModelMatrixInit: integrity check failed", _state);
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+Computes subset of the model matrix (subset of rows, subset of columns) and
+writes result to R.
+
+NOTE: If R is longer than M0xM1, it is not reallocated and additional elements
+      are not modified.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_modelmatrixcomputepartial(rbf3evaluator* modelmatrix,
+     /* Integer */ ae_vector* ridx,
+     ae_int_t m0,
+     /* Integer */ ae_vector* cidx,
+     ae_int_t m1,
+     /* Real    */ ae_matrix* r,
+     ae_state *_state)
+{
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    ae_int_t ni;
+    ae_int_t nj;
+    double v;
+    double vv;
+
+
+    ae_assert(modelmatrix->storagetype==0||modelmatrix->storagetype==1, "ModelMatrixComputePartial: unexpected StorageType", _state);
+    rallocm(m0, m1, r, _state);
+    if( modelmatrix->storagetype==0 )
+    {
+        for(i=0; i<=m0-1; i++)
+        {
+            ni = ridx->ptr.p_int[i];
+            for(j=0; j<=m1-1; j++)
+            {
+                r->ptr.pp_double[i][j] = modelmatrix->f.ptr.pp_double[ni][cidx->ptr.p_int[j]];
+            }
+        }
+        return;
+    }
+    if( modelmatrix->storagetype==1 )
+    {
+        ae_assert(modelmatrix->functype==1||modelmatrix->functype==2, "ModelMatrixComputePartial: unexpected FuncType", _state);
+        for(i=0; i<=m0-1; i++)
+        {
+            ni = ridx->ptr.p_int[i];
+            for(j=0; j<=m1-1; j++)
+            {
+                nj = cidx->ptr.p_int[j];
+                v = (double)(0);
+                if( modelmatrix->functype==1 )
+                {
+                    v = modelmatrix->funcparam*modelmatrix->funcparam;
+                }
+                if( modelmatrix->functype==2 )
+                {
+                    v = 1.0E-50;
+                }
+                for(k=0; k<=modelmatrix->nx-1; k++)
+                {
+                    vv = modelmatrix->x.ptr.pp_double[ni][k]-modelmatrix->x.ptr.pp_double[nj][k];
+                    v = v+vv*vv;
+                }
+                if( modelmatrix->functype==1 )
+                {
+                    v = -ae_sqrt(v, _state);
+                }
+                if( modelmatrix->functype==2 )
+                {
+                    v = v*0.5*ae_log(v, _state);
+                }
+                r->ptr.pp_double[i][j] = v;
+            }
+        }
+        return;
+    }
+    ae_assert(ae_false, "ModelMatrixComputePartial: integrity check failed", _state);
+}
+
+
+/*************************************************************************
+This function computes ChunkSize basis function values and stores them in
+the evaluator buffer. This function does not modify Evaluator object, thus
+it can be used in multiple threads with the same evaluator as long as different
+buffers are used.
+
+INPUT PARAMETERS:
+    Evaluator       -   evaluator object
+    X               -   origin point
+    Buf             -   preallocated buffers. Following fields are used and
+                        must have at least ChunkSize elements:
+                        * Buf.FuncBuf
+                        * Buf.WrkBuf
+                        When NeedGradInfo>=1, additionally we need
+                        the following fields to be preallocated:
+                        * Buf.MinDist2 - array[ChunkSize], filled by some
+                          positive values; on the very first call it is 1.0E50
+                          or something comparably large
+                        * Buf.DeltaBuf - array[NX,ChunkSize]
+                        * Buf.DF1 - array[ChunkSize]
+                        When NeedGradInfo>=2, additionally we need
+                        the following fields to be preallocated:
+                        * Buf.DF2 - array[ChunkSize]
+    ChunkSize       -   amount of basis functions to compute,
+                        0<ChunkSize<=Evaluator.ChunkSize
+    ChunkIdx        -   index of the chunk in Evaluator.XTChunked times NX
+    Distance0       -   strictly positive value that is added to the
+                        squared distance prior to passing it to the multiquadric
+                        kernel function. For other kernels - set it to small
+                        nonnegative value like 1.0E-50.
+    NeedGradInfo    -   whether gradient-related information is needed or
+                        not:
+                        * if 0, only FuncBuf is set on exit
+                        * if 1, MinDist2, DeltaBuf and DF1 are also set on exit
+                        * if 2, additionally DF2 is set on exit
+    
+OUTPUT PARAMETERS:
+    Buf.FuncBuf     -   array[ChunkSize], basis function values
+    Buf.MinDist2    -   array[ChunkSize], if NeedGradInfo>=1 then its
+                        I-th element is updated as MinDist2[I]:=min(MinDist2[I],DISTANCE_SQUARED(X,CENTER[I]))
+    Buf.DeltaBuf    -   array[NX,ChunkSize], if NeedGradInfo>=1 then
+                        J-th element of K-th row is set to X[K]-CENTER[J,K]
+    Buf.DF1         -   array[ChunkSize], if NeedGradInfo>=1 then
+                        J-th element is derivative of the kernel function
+                        with respect to its input (squared distance)
+    Buf.DF2         -   array[ChunkSize], if NeedGradInfo>=2 then
+                        J-th element is derivative of the kernel function
+                        with respect to its input (squared distance)
+    
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_computerowchunk(rbf3evaluator* evaluator,
+     /* Real    */ ae_vector* x,
+     rbf3evaluatorbuffer* buf,
+     ae_int_t chunksize,
+     ae_int_t chunkidx,
+     double distance0,
+     ae_int_t needgradinfo,
+     ae_state *_state)
+{
+    ae_int_t k;
+    double r2;
+    double lnr;
+
+
+    
+    /*
+     * Compute squared distance in Buf.FuncBuf
+     */
+    rsetv(chunksize, distance0, &buf->funcbuf, _state);
+    for(k=0; k<=evaluator->nx-1; k++)
+    {
+        rsetv(chunksize, x->ptr.p_double[k], &buf->wrkbuf, _state);
+        raddrv(chunksize, -1.0, &evaluator->xtchunked, chunkidx+k, &buf->wrkbuf, _state);
+        rmuladdv(chunksize, &buf->wrkbuf, &buf->wrkbuf, &buf->funcbuf, _state);
+        if( needgradinfo>=1 )
+        {
+            rcopyvr(chunksize, &buf->wrkbuf, &buf->deltabuf, k, _state);
+        }
+    }
+    if( needgradinfo>=1 )
+    {
+        rmergeminv(chunksize, &buf->funcbuf, &buf->mindist2, _state);
+    }
+    
+    /*
+     * Apply kernel function
+     */
+    if( evaluator->functype==1 )
+    {
+        
+        /*
+         * f=-sqrt(r^2+alpha^2), including f=-r as a special case
+         */
+        if( needgradinfo==0 )
+        {
+            
+            /*
+             * Only target f(r2)=-sqrt(r2) is needed
+             */
+            rsqrtv(chunksize, &buf->funcbuf, _state);
+            rmulv(chunksize, -1.0, &buf->funcbuf, _state);
+        }
+        if( needgradinfo==1 )
+        {
+            
+            /*
+             * First derivative is needed:
+             *
+             * f(r2)   = -sqrt(r2)
+             * f'(r2)  = -0.5/sqrt(r2)
+             *
+             * NOTE: FuncBuf[] is always positive due to small correction added,
+             *       thus we have no need to handle zero value as a special case
+             */
+            rsqrtv(chunksize, &buf->funcbuf, _state);
+            rmulv(chunksize, -1.0, &buf->funcbuf, _state);
+            rsetv(chunksize, 0.5, &buf->df1, _state);
+            rmergedivv(chunksize, &buf->funcbuf, &buf->df1, _state);
+        }
+        if( needgradinfo==2 )
+        {
+            
+            /*
+             * Second derivatives is needed:
+             *
+             * f(r2)   = -sqrt(r2+alpha2)
+             * f'(r2)  = -0.5/sqrt(r2+alpha2)
+             * f''(r2) =  0.25/((r2+alpha2)^(3/2))
+             *
+             * NOTE: FuncBuf[] is always positive due to small correction added,
+             *       thus we have no need to handle zero value as a special case
+             */
+            rcopymulv(chunksize, -2.0, &buf->funcbuf, &buf->wrkbuf, _state);
+            rsqrtv(chunksize, &buf->funcbuf, _state);
+            rmulv(chunksize, -1.0, &buf->funcbuf, _state);
+            rsetv(chunksize, 0.5, &buf->df1, _state);
+            rmergedivv(chunksize, &buf->funcbuf, &buf->df1, _state);
+            rcopyv(chunksize, &buf->df1, &buf->df2, _state);
+            rmergedivv(chunksize, &buf->wrkbuf, &buf->df2, _state);
+        }
+        return;
+    }
+    if( evaluator->functype==2 )
+    {
+        
+        /*
+         * f=r^2*ln(r)
+         *
+         * NOTE: FuncBuf[] is always positive due to small correction added,
+         *       thus we have no need to handle ln(0) as a special case.
+         */
+        if( needgradinfo==0 )
+        {
+            
+            /*
+             * No gradient info is required
+             *
+             * NOTE: FuncBuf[] is always positive due to small correction added,
+             *       thus we have no need to handle zero value as a special case
+             */
+            for(k=0; k<=chunksize-1; k++)
+            {
+                buf->funcbuf.ptr.p_double[k] = buf->funcbuf.ptr.p_double[k]*0.5*ae_log(buf->funcbuf.ptr.p_double[k], _state);
+            }
+        }
+        if( needgradinfo==1 )
+        {
+            
+            /*
+             * First derivative is needed:
+             *
+             * f(r2)  = 0.5*r2*ln(r2)
+             * f'(r2) = 0.5*ln(r2) + 0.5 = 0.5*(ln(r2)+1) =ln(r)+0.5
+             *
+             * NOTE: FuncBuf[] is always positive due to small correction added,
+             *       thus we have no need to handle zero value as a special case
+             */
+            for(k=0; k<=chunksize-1; k++)
+            {
+                r2 = buf->funcbuf.ptr.p_double[k];
+                lnr = 0.5*ae_log(r2, _state);
+                buf->funcbuf.ptr.p_double[k] = r2*lnr;
+                buf->df1.ptr.p_double[k] = lnr+0.5;
+            }
+        }
+        if( needgradinfo==2 )
+        {
+            
+            /*
+             * Second derivative is needed:
+             *
+             * f(r2)  = 0.5*r2*ln(r2)
+             * f'(r2) = 0.5*ln(r2) + 0.5 = 0.5*(ln(r2)+1) =ln(r)+0.5
+             * f''(r2)= 0.5/r2
+             *
+             * NOTE: FuncBuf[] is always positive due to small correction added,
+             *       thus we have no need to handle zero value as a special case
+             */
+            for(k=0; k<=chunksize-1; k++)
+            {
+                r2 = buf->funcbuf.ptr.p_double[k];
+                lnr = 0.5*ae_log(r2, _state);
+                buf->funcbuf.ptr.p_double[k] = r2*lnr;
+                buf->df1.ptr.p_double[k] = lnr+0.5;
+                buf->df2.ptr.p_double[k] = 0.5/r2;
+            }
+        }
+        return;
+    }
+    ae_assert(ae_false, "RBFV3: unexpected FuncType in ComputeRowChunk()", _state);
+}
+
+
+/*************************************************************************
+Recursive subroutine for parallel divide-and-conquer computation of matrix-
+vector product with coefficients vector. Works only for on-the-fly models
+with StorageType=1
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_modelmatrixcomputeproductrec(rbf3evaluator* modelmatrix,
+     /* Real    */ ae_vector* c,
+     /* Integer */ ae_vector* rowidx,
+     /* Real    */ ae_vector* r,
+     ae_int_t idx0,
+     ae_int_t idx1,
+     ae_bool toplevelcall,
+     ae_state *_state)
+{
+    ae_frame _frame_block;
+    ae_task_group *_child_tasks = NULL;
+    ae_bool _smp_enabled = ae_false;
+    ae_int_t s0;
+    ae_int_t s1;
+    ae_int_t i;
+    ae_int_t colidx;
+    ae_int_t curchunk;
+    ae_int_t srcidx;
+    double distance0;
+    rbf3evaluatorbuffer *buf;
+    ae_smart_ptr _buf;
+
+    ae_frame_make(_state, &_frame_block);
+    memset(&_buf, 0, sizeof(_buf));
+    ae_smart_ptr_init(&_buf, (void**)&buf, _state, ae_true);
+
+    ae_assert(modelmatrix->storagetype==1, "ModelMatrixComputeProductRec: unexpected StorageType", _state);
+    
+    /*
+     * Do we need parallel execution?
+     */
+    if( (toplevelcall&&ae_fp_greater(rmul2((double)(modelmatrix->n), (double)(idx1-idx0), _state),smpactivationlevel(_state)))&&idx1-idx0>modelmatrix->chunksize )
+    {
+        if( _trypexec_rbfv3_modelmatrixcomputeproductrec(modelmatrix,c,rowidx,r,idx0,idx1,toplevelcall, _state) )
+        {
+            ae_sync(_child_tasks, _smp_enabled, ae_true, _state);
+            ae_frame_leave(_state);
+            return;
+        }
+    }
+    
+    /*
+     * Perform recursive subdivision on the destination indexes until we fit into the chunk size
+     */
+    if( idx1-idx0>modelmatrix->chunksize )
+    {
+        ae_set_smp_support(&_child_tasks, &_smp_enabled, ae_fp_greater(rmul2((double)(modelmatrix->n), (double)(idx1-idx0), _state),spawnlevel(_state)), _state);
+        tiledsplit(idx1-idx0, modelmatrix->chunksize, &s0, &s1, _state);
+        _spawn_rbfv3_modelmatrixcomputeproductrec(modelmatrix, c, rowidx, r, idx0, idx0+s0, ae_false, _child_tasks, _smp_enabled, _state);
+        rbfv3_modelmatrixcomputeproductrec(modelmatrix, c, rowidx, r, idx0+s0, idx1, ae_false, _state);
+        ae_sync(_child_tasks, _smp_enabled, ae_true, _state);
+        ae_frame_leave(_state);
+        return;
+    }
+    
+    /*
+     * Now split column indexes
+     */
+    ae_assert(modelmatrix->functype==1||modelmatrix->functype==2, "ModelMatrixComputeProductRec: unexpected FuncType", _state);
+    ae_shared_pool_retrieve(&modelmatrix->bufferpool, &_buf, _state);
+    rsetallocv(modelmatrix->nx, 0.0, &buf->x, _state);
+    rsetallocv(modelmatrix->chunksize, 0.0, &buf->coeffbuf, _state);
+    rsetallocv(modelmatrix->chunksize, 0.0, &buf->funcbuf, _state);
+    rsetallocv(modelmatrix->chunksize, 0.0, &buf->wrkbuf, _state);
+    colidx = 0;
+    srcidx = 0;
+    distance0 = 1.0E-50;
+    if( modelmatrix->functype==1 )
+    {
+        
+        /*
+         * Kernels that add squared parameter to the squared distance
+         */
+        distance0 = ae_sqr(modelmatrix->funcparam, _state);
+    }
+    while(colidx<modelmatrix->n)
+    {
+        
+        /*
+         * Handle basecase with size at most ChunkSize*ChunkSize
+         */
+        curchunk = ae_minint(modelmatrix->chunksize, modelmatrix->n-colidx, _state);
+        rcopyvx(curchunk, c, colidx, &buf->coeffbuf, 0, _state);
+        for(i=idx0; i<=idx1-1; i++)
+        {
+            rcopyrv(modelmatrix->nx, &modelmatrix->x, rowidx->ptr.p_int[i], &buf->x, _state);
+            rbfv3_computerowchunk(modelmatrix, &buf->x, buf, curchunk, srcidx, distance0, 0, _state);
+            r->ptr.p_double[i] = r->ptr.p_double[i]+rdotv(curchunk, &buf->funcbuf, &buf->coeffbuf, _state);
+        }
+        colidx = colidx+curchunk;
+        srcidx = srcidx+modelmatrix->nx;
+    }
+    ae_shared_pool_recycle(&modelmatrix->bufferpool, &_buf, _state);
+    ae_sync(_child_tasks, _smp_enabled, ae_true, _state);
+    ae_frame_leave(_state);
+}
+
+
+/*************************************************************************
+When called in the multithreaded mode (non-NULL _group), spawns child task.
+Executed serially when called with NULL _group.
+*************************************************************************/
+void _spawn_rbfv3_modelmatrixcomputeproductrec(rbf3evaluator* modelmatrix,
+    /* Real    */ ae_vector* c,
+    /* Integer */ ae_vector* rowidx,
+    /* Real    */ ae_vector* r,
+    ae_int_t idx0,
+    ae_int_t idx1,
+    ae_bool toplevelcall,
+    ae_task_group *_group, ae_bool smp_enabled, ae_state *_state)
+{
+    if( _group==NULL || !smp_enabled)
+    {
+        rbfv3_modelmatrixcomputeproductrec(modelmatrix,c,rowidx,r,idx0,idx1,toplevelcall, _state);
+        return;
+    }
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+    {
+        ae_task_info *_task;
+        _task = ae_create_task(_group, _state);
+        _task->data.func = _task_rbfv3_modelmatrixcomputeproductrec;
+        _task->data.flags = _state->flags;
+        _task->data.parameters[0].value.val = modelmatrix;
+        _task->data.parameters[1].value.val = c;
+        _task->data.parameters[2].value.val = rowidx;
+        _task->data.parameters[3].value.val = r;
+        _task->data.parameters[4].value.ival = idx0;
+        _task->data.parameters[5].value.ival = idx1;
+        _task->data.parameters[6].value.bval = toplevelcall;
+        ae_push_task(_task, _state, ae_false);
+    }
+#else
+    abort(); /* critical integrity failure */
+#endif
+}
+
+
+/*************************************************************************
+This method is called when worker thread starts working on a non-root task.
+*************************************************************************/
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+void _task_rbfv3_modelmatrixcomputeproductrec(ae_task_data *_data, ae_state *_state)
+{
+    rbf3evaluator* modelmatrix;
+    ae_vector* c;
+    ae_vector* rowidx;
+    ae_vector* r;
+    ae_int_t idx0;
+    ae_int_t idx1;
+    ae_bool toplevelcall;
+    modelmatrix = (rbf3evaluator*)_data->parameters[0].value.val;
+    c = (ae_vector*)_data->parameters[1].value.val;
+    rowidx = (ae_vector*)_data->parameters[2].value.val;
+    r = (ae_vector*)_data->parameters[3].value.val;
+    idx0 = _data->parameters[4].value.ival;
+    idx1 = _data->parameters[5].value.ival;
+    toplevelcall = _data->parameters[6].value.bval;
+   ae_state_set_flags(_state, _data->flags);
+   rbfv3_modelmatrixcomputeproductrec(modelmatrix,c,rowidx,r,idx0,idx1,toplevelcall, _state);
+}
+#endif
+
+
+/*************************************************************************
+Inserts task as root into worker queue if called from non-worker thread, waits for completion and returns true.
+Returns false if ALGLIB is configured for serial execution or we are already in the worker context.
+*************************************************************************/
+ae_bool _trypexec_rbfv3_modelmatrixcomputeproductrec(rbf3evaluator* modelmatrix,
+    /* Real    */ ae_vector* c,
+    /* Integer */ ae_vector* rowidx,
+    /* Real    */ ae_vector* r,
+    ae_int_t idx0,
+    ae_int_t idx1,
+    ae_bool toplevelcall,
+    ae_state *_state)
+{
+#if defined(_ALGLIB_HAS_WORKSTEALING)
+    ae_task_info *_task;
+    const char *_e;
+    if( !ae_can_pexec(_state) )
+        return ae_false;
+    _task = ae_create_task(NULL, _state);
+    _task->data.func = _task_rbfv3_modelmatrixcomputeproductrec;
+    _task->data.flags = _state->flags;
+    _task->data.parameters[0].value.val = modelmatrix;
+    _task->data.parameters[1].value.val = c;
+    _task->data.parameters[2].value.val = rowidx;
+    _task->data.parameters[3].value.val = r;
+    _task->data.parameters[4].value.ival = idx0;
+    _task->data.parameters[5].value.ival = idx1;
+    _task->data.parameters[6].value.bval = toplevelcall;
+    ae_push_root_task(_task);
+    ae_wait_for_event(&_task->done_event);
+    _e = _task->exception;
+    ae_dispose_task(_task);
+    ae_assert(_e==NULL, _e, _state);
+    return ae_true;
+#else
+    return ae_false;
+#endif
+}
+
+
+/*************************************************************************
+Computes product of the model matrix with vector C, writes result to R.
+
+NOTE: this function is thread safe and can be used with the same model matrix
+      from different threads
+
+NOTE: If R is longer than M, it is not reallocated and additional elements
+      are not modified.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_modelmatrixcomputeproduct(rbf3evaluator* modelmatrix,
+     /* Real    */ ae_vector* c,
+     /* Real    */ ae_vector* r,
+     ae_state *_state)
+{
+
+
+    ae_assert(modelmatrix->storagetype==0||modelmatrix->storagetype==1, "ModelMatrixComputeProduct: unexpected StorageType", _state);
+    rallocv(modelmatrix->n, r, _state);
+    if( modelmatrix->storagetype==0 )
+    {
+        rmatrixgemv(modelmatrix->n, modelmatrix->n, 1.0, &modelmatrix->f, 0, 0, 0, c, 0, 0.0, r, 0, _state);
+        return;
+    }
+    if( modelmatrix->storagetype==1 )
+    {
+        rsetv(modelmatrix->n, 0.0, r, _state);
+        rbfv3_modelmatrixcomputeproductrec(modelmatrix, c, &modelmatrix->entireset, r, 0, modelmatrix->n, ae_true, _state);
+        return;
+    }
+    ae_assert(ae_false, "ModelMatrixComputeProduct: integrity check failed", _state);
+}
+
+
+/*************************************************************************
+Computes product of the subset of the model matrix (only rows with indexes
+from Idx[]) with vector C, writes result to R.
+
+NOTE: this function is thread safe and can be used with the same model matrix
+      from different threads
+
+NOTE: If R is longer than M, it is not reallocated and additional elements
+      are not modified.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static void rbfv3_modelmatrixcomputeproductatnodes(rbf3evaluator* modelmatrix,
+     /* Real    */ ae_vector* c,
+     /* Integer */ ae_vector* idx,
+     ae_int_t m,
+     /* Real    */ ae_vector* r,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+
+    ae_assert(modelmatrix->storagetype==0||modelmatrix->storagetype==1, "ModelMatrixComputeProductAtNodes: unexpected StorageType", _state);
+    rallocv(m, r, _state);
+    if( modelmatrix->storagetype==0 )
+    {
+        for(i=0; i<=m-1; i++)
+        {
+            r->ptr.p_double[i] = rdotvr(modelmatrix->n, c, &modelmatrix->f, idx->ptr.p_int[i], _state);
+        }
+        return;
+    }
+    if( modelmatrix->storagetype==1 )
+    {
+        rsetv(m, 0.0, r, _state);
+        rbfv3_modelmatrixcomputeproductrec(modelmatrix, c, idx, r, 0, m, ae_true, _state);
+        return;
+    }
+    ae_assert(ae_false, "ModelMatrixComputeProductAtNodes: integrity check failed", _state);
+}
+
+
+/*************************************************************************
+Checks whether basis function is conditionally positive definite or not,
+given the polynomial term type (ATerm=1 means linear, ATerm=2 means constant,
+ATerm=3 means no polynomial term).
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Sergey Bochkanov
+*************************************************************************/
+static ae_bool rbfv3_iscpdfunction(ae_int_t functype,
+     ae_int_t aterm,
+     ae_state *_state)
+{
+    ae_bool result;
+
+
+    ae_assert((aterm==1||aterm==2)||aterm==3, "RBFV3: integrity check 3563 failed", _state);
+    result = ae_false;
+    if( functype==1 )
+    {
+        result = aterm==2||aterm==1;
+        return result;
+    }
+    if( functype==2 )
+    {
+        result = aterm==1;
+        return result;
+    }
+    ae_assert(ae_false, "IsCPDFunction: unexpected FuncType", _state);
+    return result;
+}
+
+
+void _rbf3evaluator_init(void* _p, ae_state *_state, ae_bool make_automatic)
+{
+    rbf3evaluator *p = (rbf3evaluator*)_p;
+    ae_touch_ptr((void*)p);
+    ae_matrix_init(&p->f, 0, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->entireset, 0, DT_INT, _state, make_automatic);
+    ae_matrix_init(&p->x, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->xtchunked, 0, 0, DT_REAL, _state, make_automatic);
+    ae_shared_pool_init(&p->bufferpool, _state, make_automatic);
+    ae_vector_init(&p->chunk1, 0, DT_REAL, _state, make_automatic);
+}
+
+
+void _rbf3evaluator_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_automatic)
+{
+    rbf3evaluator *dst = (rbf3evaluator*)_dst;
+    rbf3evaluator *src = (rbf3evaluator*)_src;
+    dst->n = src->n;
+    dst->storagetype = src->storagetype;
+    ae_matrix_init_copy(&dst->f, &src->f, _state, make_automatic);
+    dst->nx = src->nx;
+    dst->functype = src->functype;
+    dst->funcparam = src->funcparam;
+    dst->chunksize = src->chunksize;
+    ae_vector_init_copy(&dst->entireset, &src->entireset, _state, make_automatic);
+    ae_matrix_init_copy(&dst->x, &src->x, _state, make_automatic);
+    ae_matrix_init_copy(&dst->xtchunked, &src->xtchunked, _state, make_automatic);
+    ae_shared_pool_init_copy(&dst->bufferpool, &src->bufferpool, _state, make_automatic);
+    ae_vector_init_copy(&dst->chunk1, &src->chunk1, _state, make_automatic);
+}
+
+
+void _rbf3evaluator_clear(void* _p)
+{
+    rbf3evaluator *p = (rbf3evaluator*)_p;
+    ae_touch_ptr((void*)p);
+    ae_matrix_clear(&p->f);
+    ae_vector_clear(&p->entireset);
+    ae_matrix_clear(&p->x);
+    ae_matrix_clear(&p->xtchunked);
+    ae_shared_pool_clear(&p->bufferpool);
+    ae_vector_clear(&p->chunk1);
+}
+
+
+void _rbf3evaluator_destroy(void* _p)
+{
+    rbf3evaluator *p = (rbf3evaluator*)_p;
+    ae_touch_ptr((void*)p);
+    ae_matrix_destroy(&p->f);
+    ae_vector_destroy(&p->entireset);
+    ae_matrix_destroy(&p->x);
+    ae_matrix_destroy(&p->xtchunked);
+    ae_shared_pool_destroy(&p->bufferpool);
+    ae_vector_destroy(&p->chunk1);
+}
+
+
+void _rbf3evaluatorbuffer_init(void* _p, ae_state *_state, ae_bool make_automatic)
+{
+    rbf3evaluatorbuffer *p = (rbf3evaluatorbuffer*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_init(&p->x, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->coeffbuf, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->funcbuf, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->wrkbuf, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->mindist2, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->df1, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->df2, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->deltabuf, 0, 0, DT_REAL, _state, make_automatic);
+}
+
+
+void _rbf3evaluatorbuffer_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_automatic)
+{
+    rbf3evaluatorbuffer *dst = (rbf3evaluatorbuffer*)_dst;
+    rbf3evaluatorbuffer *src = (rbf3evaluatorbuffer*)_src;
+    ae_vector_init_copy(&dst->x, &src->x, _state, make_automatic);
+    ae_vector_init_copy(&dst->coeffbuf, &src->coeffbuf, _state, make_automatic);
+    ae_vector_init_copy(&dst->funcbuf, &src->funcbuf, _state, make_automatic);
+    ae_vector_init_copy(&dst->wrkbuf, &src->wrkbuf, _state, make_automatic);
+    ae_vector_init_copy(&dst->mindist2, &src->mindist2, _state, make_automatic);
+    ae_vector_init_copy(&dst->df1, &src->df1, _state, make_automatic);
+    ae_vector_init_copy(&dst->df2, &src->df2, _state, make_automatic);
+    ae_matrix_init_copy(&dst->deltabuf, &src->deltabuf, _state, make_automatic);
+}
+
+
+void _rbf3evaluatorbuffer_clear(void* _p)
+{
+    rbf3evaluatorbuffer *p = (rbf3evaluatorbuffer*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_clear(&p->x);
+    ae_vector_clear(&p->coeffbuf);
+    ae_vector_clear(&p->funcbuf);
+    ae_vector_clear(&p->wrkbuf);
+    ae_vector_clear(&p->mindist2);
+    ae_vector_clear(&p->df1);
+    ae_vector_clear(&p->df2);
+    ae_matrix_clear(&p->deltabuf);
+}
+
+
+void _rbf3evaluatorbuffer_destroy(void* _p)
+{
+    rbf3evaluatorbuffer *p = (rbf3evaluatorbuffer*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_destroy(&p->x);
+    ae_vector_destroy(&p->coeffbuf);
+    ae_vector_destroy(&p->funcbuf);
+    ae_vector_destroy(&p->wrkbuf);
+    ae_vector_destroy(&p->mindist2);
+    ae_vector_destroy(&p->df1);
+    ae_vector_destroy(&p->df2);
+    ae_matrix_destroy(&p->deltabuf);
+}
+
+
+void _rbfv3calcbuffer_init(void* _p, ae_state *_state, ae_bool make_automatic)
+{
+    rbfv3calcbuffer *p = (rbfv3calcbuffer*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_init(&p->x, 0, DT_REAL, _state, make_automatic);
+    _rbf3evaluatorbuffer_init(&p->evalbuf, _state, make_automatic);
+    ae_vector_init(&p->x123, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->y123, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->xg, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->yg, 0, DT_REAL, _state, make_automatic);
+}
+
+
+void _rbfv3calcbuffer_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_automatic)
+{
+    rbfv3calcbuffer *dst = (rbfv3calcbuffer*)_dst;
+    rbfv3calcbuffer *src = (rbfv3calcbuffer*)_src;
+    ae_vector_init_copy(&dst->x, &src->x, _state, make_automatic);
+    _rbf3evaluatorbuffer_init_copy(&dst->evalbuf, &src->evalbuf, _state, make_automatic);
+    ae_vector_init_copy(&dst->x123, &src->x123, _state, make_automatic);
+    ae_vector_init_copy(&dst->y123, &src->y123, _state, make_automatic);
+    ae_vector_init_copy(&dst->xg, &src->xg, _state, make_automatic);
+    ae_vector_init_copy(&dst->yg, &src->yg, _state, make_automatic);
+}
+
+
+void _rbfv3calcbuffer_clear(void* _p)
+{
+    rbfv3calcbuffer *p = (rbfv3calcbuffer*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_clear(&p->x);
+    _rbf3evaluatorbuffer_clear(&p->evalbuf);
+    ae_vector_clear(&p->x123);
+    ae_vector_clear(&p->y123);
+    ae_vector_clear(&p->xg);
+    ae_vector_clear(&p->yg);
+}
+
+
+void _rbfv3calcbuffer_destroy(void* _p)
+{
+    rbfv3calcbuffer *p = (rbfv3calcbuffer*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_destroy(&p->x);
+    _rbf3evaluatorbuffer_destroy(&p->evalbuf);
+    ae_vector_destroy(&p->x123);
+    ae_vector_destroy(&p->y123);
+    ae_vector_destroy(&p->xg);
+    ae_vector_destroy(&p->yg);
+}
+
+
+void _acbfbuilder_init(void* _p, ae_state *_state, ae_bool make_automatic)
+{
+    acbfbuilder *p = (acbfbuilder*)_p;
+    ae_touch_ptr((void*)p);
+    ae_matrix_init(&p->xx, 0, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->globalgrid, 0, DT_INT, _state, make_automatic);
+    _kdtree_init(&p->kdt, _state, make_automatic);
+    _kdtree_init(&p->kdt1, _state, make_automatic);
+    _kdtree_init(&p->kdt2, _state, make_automatic);
+    ae_shared_pool_init(&p->bufferpool, _state, make_automatic);
+    ae_shared_pool_init(&p->chunksproducer, _state, make_automatic);
+    ae_shared_pool_init(&p->chunkspool, _state, make_automatic);
+    ae_vector_init(&p->wrkidx, 0, DT_INT, _state, make_automatic);
+}
+
+
+void _acbfbuilder_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_automatic)
+{
+    acbfbuilder *dst = (acbfbuilder*)_dst;
+    acbfbuilder *src = (acbfbuilder*)_src;
+    dst->dodetailedtrace = src->dodetailedtrace;
+    dst->ntotal = src->ntotal;
+    dst->nx = src->nx;
+    ae_matrix_init_copy(&dst->xx, &src->xx, _state, make_automatic);
+    dst->functype = src->functype;
+    dst->funcparam = src->funcparam;
+    dst->roughdatasetdiameter = src->roughdatasetdiameter;
+    dst->nglobal = src->nglobal;
+    ae_vector_init_copy(&dst->globalgrid, &src->globalgrid, _state, make_automatic);
+    dst->globalgridseparation = src->globalgridseparation;
+    dst->nlocal = src->nlocal;
+    dst->ncorrection = src->ncorrection;
+    dst->correctorgrowth = src->correctorgrowth;
+    dst->batchsize = src->batchsize;
+    dst->lambdav = src->lambdav;
+    dst->aterm = src->aterm;
+    _kdtree_init_copy(&dst->kdt, &src->kdt, _state, make_automatic);
+    _kdtree_init_copy(&dst->kdt1, &src->kdt1, _state, make_automatic);
+    _kdtree_init_copy(&dst->kdt2, &src->kdt2, _state, make_automatic);
+    ae_shared_pool_init_copy(&dst->bufferpool, &src->bufferpool, _state, make_automatic);
+    ae_shared_pool_init_copy(&dst->chunksproducer, &src->chunksproducer, _state, make_automatic);
+    ae_shared_pool_init_copy(&dst->chunkspool, &src->chunkspool, _state, make_automatic);
+    ae_vector_init_copy(&dst->wrkidx, &src->wrkidx, _state, make_automatic);
+}
+
+
+void _acbfbuilder_clear(void* _p)
+{
+    acbfbuilder *p = (acbfbuilder*)_p;
+    ae_touch_ptr((void*)p);
+    ae_matrix_clear(&p->xx);
+    ae_vector_clear(&p->globalgrid);
+    _kdtree_clear(&p->kdt);
+    _kdtree_clear(&p->kdt1);
+    _kdtree_clear(&p->kdt2);
+    ae_shared_pool_clear(&p->bufferpool);
+    ae_shared_pool_clear(&p->chunksproducer);
+    ae_shared_pool_clear(&p->chunkspool);
+    ae_vector_clear(&p->wrkidx);
+}
+
+
+void _acbfbuilder_destroy(void* _p)
+{
+    acbfbuilder *p = (acbfbuilder*)_p;
+    ae_touch_ptr((void*)p);
+    ae_matrix_destroy(&p->xx);
+    ae_vector_destroy(&p->globalgrid);
+    _kdtree_destroy(&p->kdt);
+    _kdtree_destroy(&p->kdt1);
+    _kdtree_destroy(&p->kdt2);
+    ae_shared_pool_destroy(&p->bufferpool);
+    ae_shared_pool_destroy(&p->chunksproducer);
+    ae_shared_pool_destroy(&p->chunkspool);
+    ae_vector_destroy(&p->wrkidx);
+}
+
+
+void _acbfbuffer_init(void* _p, ae_state *_state, ae_bool make_automatic)
+{
+    acbfbuffer *p = (acbfbuffer*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_init(&p->bflags, 0, DT_BOOL, _state, make_automatic);
+    _kdtreerequestbuffer_init(&p->kdtbuf, _state, make_automatic);
+    _kdtreerequestbuffer_init(&p->kdt1buf, _state, make_automatic);
+    _kdtreerequestbuffer_init(&p->kdt2buf, _state, make_automatic);
+    ae_vector_init(&p->tmpboxmin, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->tmpboxmax, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->currentnodes, 0, DT_INT, _state, make_automatic);
+    ae_vector_init(&p->neighbors, 0, DT_INT, _state, make_automatic);
+    ae_vector_init(&p->chosenneighbors, 0, DT_INT, _state, make_automatic);
+    ae_vector_init(&p->y, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->z, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->d, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->atwrk, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->xq, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->q, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->q1, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->wrkq, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->b, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->c, 0, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->choltmp, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->tau, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->r, 0, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->perm, 0, DT_INT, _state, make_automatic);
+}
+
+
+void _acbfbuffer_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_automatic)
+{
+    acbfbuffer *dst = (acbfbuffer*)_dst;
+    acbfbuffer *src = (acbfbuffer*)_src;
+    ae_vector_init_copy(&dst->bflags, &src->bflags, _state, make_automatic);
+    _kdtreerequestbuffer_init_copy(&dst->kdtbuf, &src->kdtbuf, _state, make_automatic);
+    _kdtreerequestbuffer_init_copy(&dst->kdt1buf, &src->kdt1buf, _state, make_automatic);
+    _kdtreerequestbuffer_init_copy(&dst->kdt2buf, &src->kdt2buf, _state, make_automatic);
+    ae_vector_init_copy(&dst->tmpboxmin, &src->tmpboxmin, _state, make_automatic);
+    ae_vector_init_copy(&dst->tmpboxmax, &src->tmpboxmax, _state, make_automatic);
+    ae_vector_init_copy(&dst->currentnodes, &src->currentnodes, _state, make_automatic);
+    ae_vector_init_copy(&dst->neighbors, &src->neighbors, _state, make_automatic);
+    ae_vector_init_copy(&dst->chosenneighbors, &src->chosenneighbors, _state, make_automatic);
+    ae_vector_init_copy(&dst->y, &src->y, _state, make_automatic);
+    ae_vector_init_copy(&dst->z, &src->z, _state, make_automatic);
+    ae_vector_init_copy(&dst->d, &src->d, _state, make_automatic);
+    ae_matrix_init_copy(&dst->atwrk, &src->atwrk, _state, make_automatic);
+    ae_matrix_init_copy(&dst->xq, &src->xq, _state, make_automatic);
+    ae_matrix_init_copy(&dst->q, &src->q, _state, make_automatic);
+    ae_matrix_init_copy(&dst->q1, &src->q1, _state, make_automatic);
+    ae_matrix_init_copy(&dst->wrkq, &src->wrkq, _state, make_automatic);
+    ae_matrix_init_copy(&dst->b, &src->b, _state, make_automatic);
+    ae_matrix_init_copy(&dst->c, &src->c, _state, make_automatic);
+    ae_vector_init_copy(&dst->choltmp, &src->choltmp, _state, make_automatic);
+    ae_vector_init_copy(&dst->tau, &src->tau, _state, make_automatic);
+    ae_matrix_init_copy(&dst->r, &src->r, _state, make_automatic);
+    ae_vector_init_copy(&dst->perm, &src->perm, _state, make_automatic);
+}
+
+
+void _acbfbuffer_clear(void* _p)
+{
+    acbfbuffer *p = (acbfbuffer*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_clear(&p->bflags);
+    _kdtreerequestbuffer_clear(&p->kdtbuf);
+    _kdtreerequestbuffer_clear(&p->kdt1buf);
+    _kdtreerequestbuffer_clear(&p->kdt2buf);
+    ae_vector_clear(&p->tmpboxmin);
+    ae_vector_clear(&p->tmpboxmax);
+    ae_vector_clear(&p->currentnodes);
+    ae_vector_clear(&p->neighbors);
+    ae_vector_clear(&p->chosenneighbors);
+    ae_vector_clear(&p->y);
+    ae_vector_clear(&p->z);
+    ae_vector_clear(&p->d);
+    ae_matrix_clear(&p->atwrk);
+    ae_matrix_clear(&p->xq);
+    ae_matrix_clear(&p->q);
+    ae_matrix_clear(&p->q1);
+    ae_matrix_clear(&p->wrkq);
+    ae_matrix_clear(&p->b);
+    ae_matrix_clear(&p->c);
+    ae_vector_clear(&p->choltmp);
+    ae_vector_clear(&p->tau);
+    ae_matrix_clear(&p->r);
+    ae_vector_clear(&p->perm);
+}
+
+
+void _acbfbuffer_destroy(void* _p)
+{
+    acbfbuffer *p = (acbfbuffer*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_destroy(&p->bflags);
+    _kdtreerequestbuffer_destroy(&p->kdtbuf);
+    _kdtreerequestbuffer_destroy(&p->kdt1buf);
+    _kdtreerequestbuffer_destroy(&p->kdt2buf);
+    ae_vector_destroy(&p->tmpboxmin);
+    ae_vector_destroy(&p->tmpboxmax);
+    ae_vector_destroy(&p->currentnodes);
+    ae_vector_destroy(&p->neighbors);
+    ae_vector_destroy(&p->chosenneighbors);
+    ae_vector_destroy(&p->y);
+    ae_vector_destroy(&p->z);
+    ae_vector_destroy(&p->d);
+    ae_matrix_destroy(&p->atwrk);
+    ae_matrix_destroy(&p->xq);
+    ae_matrix_destroy(&p->q);
+    ae_matrix_destroy(&p->q1);
+    ae_matrix_destroy(&p->wrkq);
+    ae_matrix_destroy(&p->b);
+    ae_matrix_destroy(&p->c);
+    ae_vector_destroy(&p->choltmp);
+    ae_vector_destroy(&p->tau);
+    ae_matrix_destroy(&p->r);
+    ae_vector_destroy(&p->perm);
+}
+
+
+void _acbfchunk_init(void* _p, ae_state *_state, ae_bool make_automatic)
+{
+    acbfchunk *p = (acbfchunk*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_init(&p->targetrows, 0, DT_INT, _state, make_automatic);
+    ae_vector_init(&p->targetcols, 0, DT_INT, _state, make_automatic);
+    ae_matrix_init(&p->s, 0, 0, DT_REAL, _state, make_automatic);
+}
+
+
+void _acbfchunk_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_automatic)
+{
+    acbfchunk *dst = (acbfchunk*)_dst;
+    acbfchunk *src = (acbfchunk*)_src;
+    dst->ntargetrows = src->ntargetrows;
+    dst->ntargetcols = src->ntargetcols;
+    ae_vector_init_copy(&dst->targetrows, &src->targetrows, _state, make_automatic);
+    ae_vector_init_copy(&dst->targetcols, &src->targetcols, _state, make_automatic);
+    ae_matrix_init_copy(&dst->s, &src->s, _state, make_automatic);
+}
+
+
+void _acbfchunk_clear(void* _p)
+{
+    acbfchunk *p = (acbfchunk*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_clear(&p->targetrows);
+    ae_vector_clear(&p->targetcols);
+    ae_matrix_clear(&p->s);
+}
+
+
+void _acbfchunk_destroy(void* _p)
+{
+    acbfchunk *p = (acbfchunk*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_destroy(&p->targetrows);
+    ae_vector_destroy(&p->targetcols);
+    ae_matrix_destroy(&p->s);
+}
+
+
+void _rbf3ddmbuffer_init(void* _p, ae_state *_state, ae_bool make_automatic)
+{
+    rbf3ddmbuffer *p = (rbf3ddmbuffer*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_init(&p->bflags, 0, DT_BOOL, _state, make_automatic);
+    ae_vector_init(&p->idx2preccol, 0, DT_INT, _state, make_automatic);
+    _kdtreerequestbuffer_init(&p->kdtbuf, _state, make_automatic);
+    ae_vector_init(&p->tmpboxmin, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->tmpboxmax, 0, DT_REAL, _state, make_automatic);
+}
+
+
+void _rbf3ddmbuffer_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_automatic)
+{
+    rbf3ddmbuffer *dst = (rbf3ddmbuffer*)_dst;
+    rbf3ddmbuffer *src = (rbf3ddmbuffer*)_src;
+    ae_vector_init_copy(&dst->bflags, &src->bflags, _state, make_automatic);
+    ae_vector_init_copy(&dst->idx2preccol, &src->idx2preccol, _state, make_automatic);
+    _kdtreerequestbuffer_init_copy(&dst->kdtbuf, &src->kdtbuf, _state, make_automatic);
+    ae_vector_init_copy(&dst->tmpboxmin, &src->tmpboxmin, _state, make_automatic);
+    ae_vector_init_copy(&dst->tmpboxmax, &src->tmpboxmax, _state, make_automatic);
+}
+
+
+void _rbf3ddmbuffer_clear(void* _p)
+{
+    rbf3ddmbuffer *p = (rbf3ddmbuffer*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_clear(&p->bflags);
+    ae_vector_clear(&p->idx2preccol);
+    _kdtreerequestbuffer_clear(&p->kdtbuf);
+    ae_vector_clear(&p->tmpboxmin);
+    ae_vector_clear(&p->tmpboxmax);
+}
+
+
+void _rbf3ddmbuffer_destroy(void* _p)
+{
+    rbf3ddmbuffer *p = (rbf3ddmbuffer*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_destroy(&p->bflags);
+    ae_vector_destroy(&p->idx2preccol);
+    _kdtreerequestbuffer_destroy(&p->kdtbuf);
+    ae_vector_destroy(&p->tmpboxmin);
+    ae_vector_destroy(&p->tmpboxmax);
+}
+
+
+void _rbf3ddmsubproblem_init(void* _p, ae_state *_state, ae_bool make_automatic)
+{
+    rbf3ddmsubproblem *p = (rbf3ddmsubproblem*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_init(&p->targetnodes, 0, DT_INT, _state, make_automatic);
+    ae_vector_init(&p->workingnodes, 0, DT_INT, _state, make_automatic);
+    ae_matrix_init(&p->regsystem, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->wrklu, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->rhs, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->qtrhs, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->sol, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->pred, 0, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->wrkp, 0, DT_INT, _state, make_automatic);
+    ae_matrix_init(&p->wrkq, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->wrkr, 0, 0, DT_REAL, _state, make_automatic);
+}
+
+
+void _rbf3ddmsubproblem_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_automatic)
+{
+    rbf3ddmsubproblem *dst = (rbf3ddmsubproblem*)_dst;
+    rbf3ddmsubproblem *src = (rbf3ddmsubproblem*)_src;
+    dst->isvalid = src->isvalid;
+    dst->ntarget = src->ntarget;
+    ae_vector_init_copy(&dst->targetnodes, &src->targetnodes, _state, make_automatic);
+    dst->nwork = src->nwork;
+    ae_vector_init_copy(&dst->workingnodes, &src->workingnodes, _state, make_automatic);
+    ae_matrix_init_copy(&dst->regsystem, &src->regsystem, _state, make_automatic);
+    dst->decomposition = src->decomposition;
+    ae_matrix_init_copy(&dst->wrklu, &src->wrklu, _state, make_automatic);
+    ae_matrix_init_copy(&dst->rhs, &src->rhs, _state, make_automatic);
+    ae_matrix_init_copy(&dst->qtrhs, &src->qtrhs, _state, make_automatic);
+    ae_matrix_init_copy(&dst->sol, &src->sol, _state, make_automatic);
+    ae_matrix_init_copy(&dst->pred, &src->pred, _state, make_automatic);
+    ae_vector_init_copy(&dst->wrkp, &src->wrkp, _state, make_automatic);
+    ae_matrix_init_copy(&dst->wrkq, &src->wrkq, _state, make_automatic);
+    ae_matrix_init_copy(&dst->wrkr, &src->wrkr, _state, make_automatic);
+}
+
+
+void _rbf3ddmsubproblem_clear(void* _p)
+{
+    rbf3ddmsubproblem *p = (rbf3ddmsubproblem*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_clear(&p->targetnodes);
+    ae_vector_clear(&p->workingnodes);
+    ae_matrix_clear(&p->regsystem);
+    ae_matrix_clear(&p->wrklu);
+    ae_matrix_clear(&p->rhs);
+    ae_matrix_clear(&p->qtrhs);
+    ae_matrix_clear(&p->sol);
+    ae_matrix_clear(&p->pred);
+    ae_vector_clear(&p->wrkp);
+    ae_matrix_clear(&p->wrkq);
+    ae_matrix_clear(&p->wrkr);
+}
+
+
+void _rbf3ddmsubproblem_destroy(void* _p)
+{
+    rbf3ddmsubproblem *p = (rbf3ddmsubproblem*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_destroy(&p->targetnodes);
+    ae_vector_destroy(&p->workingnodes);
+    ae_matrix_destroy(&p->regsystem);
+    ae_matrix_destroy(&p->wrklu);
+    ae_matrix_destroy(&p->rhs);
+    ae_matrix_destroy(&p->qtrhs);
+    ae_matrix_destroy(&p->sol);
+    ae_matrix_destroy(&p->pred);
+    ae_vector_destroy(&p->wrkp);
+    ae_matrix_destroy(&p->wrkq);
+    ae_matrix_destroy(&p->wrkr);
+}
+
+
+void _rbf3ddmsolver_init(void* _p, ae_state *_state, ae_bool make_automatic)
+{
+    rbf3ddmsolver *p = (rbf3ddmsolver*)_p;
+    ae_touch_ptr((void*)p);
+    _kdtree_init(&p->kdt, _state, make_automatic);
+    ae_shared_pool_init(&p->bufferpool, _state, make_automatic);
+    ae_shared_pool_init(&p->subproblemspool, _state, make_automatic);
+    ae_shared_pool_init(&p->subproblemsbuffer, _state, make_automatic);
+    ae_matrix_init(&p->corrq, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->corrr, 0, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->corrnodes, 0, DT_INT, _state, make_automatic);
+    ae_matrix_init(&p->corrx, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->tmpres1, 0, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->tmpupd1, 0, 0, DT_REAL, _state, make_automatic);
+}
+
+
+void _rbf3ddmsolver_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_automatic)
+{
+    rbf3ddmsolver *dst = (rbf3ddmsolver*)_dst;
+    rbf3ddmsolver *src = (rbf3ddmsolver*)_src;
+    dst->lambdav = src->lambdav;
+    _kdtree_init_copy(&dst->kdt, &src->kdt, _state, make_automatic);
+    ae_shared_pool_init_copy(&dst->bufferpool, &src->bufferpool, _state, make_automatic);
+    dst->subproblemscnt = src->subproblemscnt;
+    ae_shared_pool_init_copy(&dst->subproblemspool, &src->subproblemspool, _state, make_automatic);
+    ae_shared_pool_init_copy(&dst->subproblemsbuffer, &src->subproblemsbuffer, _state, make_automatic);
+    dst->ncorrector = src->ncorrector;
+    ae_matrix_init_copy(&dst->corrq, &src->corrq, _state, make_automatic);
+    ae_matrix_init_copy(&dst->corrr, &src->corrr, _state, make_automatic);
+    ae_vector_init_copy(&dst->corrnodes, &src->corrnodes, _state, make_automatic);
+    ae_matrix_init_copy(&dst->corrx, &src->corrx, _state, make_automatic);
+    ae_matrix_init_copy(&dst->tmpres1, &src->tmpres1, _state, make_automatic);
+    ae_matrix_init_copy(&dst->tmpupd1, &src->tmpupd1, _state, make_automatic);
+    dst->cntlu = src->cntlu;
+    dst->cntregqr = src->cntregqr;
+}
+
+
+void _rbf3ddmsolver_clear(void* _p)
+{
+    rbf3ddmsolver *p = (rbf3ddmsolver*)_p;
+    ae_touch_ptr((void*)p);
+    _kdtree_clear(&p->kdt);
+    ae_shared_pool_clear(&p->bufferpool);
+    ae_shared_pool_clear(&p->subproblemspool);
+    ae_shared_pool_clear(&p->subproblemsbuffer);
+    ae_matrix_clear(&p->corrq);
+    ae_matrix_clear(&p->corrr);
+    ae_vector_clear(&p->corrnodes);
+    ae_matrix_clear(&p->corrx);
+    ae_matrix_clear(&p->tmpres1);
+    ae_matrix_clear(&p->tmpupd1);
+}
+
+
+void _rbf3ddmsolver_destroy(void* _p)
+{
+    rbf3ddmsolver *p = (rbf3ddmsolver*)_p;
+    ae_touch_ptr((void*)p);
+    _kdtree_destroy(&p->kdt);
+    ae_shared_pool_destroy(&p->bufferpool);
+    ae_shared_pool_destroy(&p->subproblemspool);
+    ae_shared_pool_destroy(&p->subproblemsbuffer);
+    ae_matrix_destroy(&p->corrq);
+    ae_matrix_destroy(&p->corrr);
+    ae_vector_destroy(&p->corrnodes);
+    ae_matrix_destroy(&p->corrx);
+    ae_matrix_destroy(&p->tmpres1);
+    ae_matrix_destroy(&p->tmpupd1);
+}
+
+
+void _rbfv3model_init(void* _p, ae_state *_state, ae_bool make_automatic)
+{
+    rbfv3model *p = (rbfv3model*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_init(&p->s, 0, DT_REAL, _state, make_automatic);
+    ae_matrix_init(&p->v, 0, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->cw, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->pointindexes, 0, DT_INT, _state, make_automatic);
+    _rbf3evaluator_init(&p->evaluator, _state, make_automatic);
+    ae_matrix_init(&p->wchunked, 0, 0, DT_REAL, _state, make_automatic);
+    _rbfv3calcbuffer_init(&p->calcbuf, _state, make_automatic);
+}
+
+
+void _rbfv3model_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_automatic)
+{
+    rbfv3model *dst = (rbfv3model*)_dst;
+    rbfv3model *src = (rbfv3model*)_src;
+    dst->ny = src->ny;
+    dst->nx = src->nx;
+    dst->bftype = src->bftype;
+    dst->bfparam = src->bfparam;
+    ae_vector_init_copy(&dst->s, &src->s, _state, make_automatic);
+    ae_matrix_init_copy(&dst->v, &src->v, _state, make_automatic);
+    ae_vector_init_copy(&dst->cw, &src->cw, _state, make_automatic);
+    ae_vector_init_copy(&dst->pointindexes, &src->pointindexes, _state, make_automatic);
+    dst->nc = src->nc;
+    _rbf3evaluator_init_copy(&dst->evaluator, &src->evaluator, _state, make_automatic);
+    ae_matrix_init_copy(&dst->wchunked, &src->wchunked, _state, make_automatic);
+    _rbfv3calcbuffer_init_copy(&dst->calcbuf, &src->calcbuf, _state, make_automatic);
+    dst->dbgregqrusedforddm = src->dbgregqrusedforddm;
+}
+
+
+void _rbfv3model_clear(void* _p)
+{
+    rbfv3model *p = (rbfv3model*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_clear(&p->s);
+    ae_matrix_clear(&p->v);
+    ae_vector_clear(&p->cw);
+    ae_vector_clear(&p->pointindexes);
+    _rbf3evaluator_clear(&p->evaluator);
+    ae_matrix_clear(&p->wchunked);
+    _rbfv3calcbuffer_clear(&p->calcbuf);
+}
+
+
+void _rbfv3model_destroy(void* _p)
+{
+    rbfv3model *p = (rbfv3model*)_p;
+    ae_touch_ptr((void*)p);
+    ae_vector_destroy(&p->s);
+    ae_matrix_destroy(&p->v);
+    ae_vector_destroy(&p->cw);
+    ae_vector_destroy(&p->pointindexes);
+    _rbf3evaluator_destroy(&p->evaluator);
+    ae_matrix_destroy(&p->wchunked);
+    _rbfv3calcbuffer_destroy(&p->calcbuf);
+}
+
+
+void _rbfv3report_init(void* _p, ae_state *_state, ae_bool make_automatic)
+{
+    rbfv3report *p = (rbfv3report*)_p;
+    ae_touch_ptr((void*)p);
+}
+
+
+void _rbfv3report_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_automatic)
+{
+    rbfv3report *dst = (rbfv3report*)_dst;
+    rbfv3report *src = (rbfv3report*)_src;
+    dst->terminationtype = src->terminationtype;
+    dst->maxerror = src->maxerror;
+    dst->rmserror = src->rmserror;
+    dst->iterationscount = src->iterationscount;
+}
+
+
+void _rbfv3report_clear(void* _p)
+{
+    rbfv3report *p = (rbfv3report*)_p;
+    ae_touch_ptr((void*)p);
+}
+
+
+void _rbfv3report_destroy(void* _p)
+{
+    rbfv3report *p = (rbfv3report*)_p;
     ae_touch_ptr((void*)p);
 }
 
@@ -49755,7 +58012,7 @@ void rbfv2basisfuncdiff2(ae_int_t bf,
          * if D2<3:
          *       F = Exp(1)*Exp(-D2)*Exp(-1/(1-D2/9))
          *      dF =  -F * [pow(D2/9-1,-2)/9 + 1]
-         *     d2F = -dF * [pow(D2/9-1,-2)/9 + 1] + F*(2/81)*pow(D2/9-1,-3)
+         *     d2F = -dF * [pow(D2/9-1,-2)/9 + 1] - F*(2/81)*pow(D2/9-1,-3)
          * else:
          *     0
          */
@@ -49769,7 +58026,7 @@ void rbfv2basisfuncdiff2(ae_int_t bf,
         }
         *f = ae_exp((double)(1), _state)*ae_exp(-d2, _state)*ae_exp(-1/v, _state);
         *df = -*f*(1/(9*v*v)+1);
-        *d2f = -*df*(1/(9*v*v)+1)+*f*((double)2/(double)81)/(v*v*v);
+        *d2f = -*df*(1/(9*v*v)+1)-*f*((double)2/(double)81)/(v*v*v);
         return;
     }
     ae_assert(ae_false, "RBFV2BasisFuncDiff2: unknown BF type", _state);
@@ -50067,7 +58324,287 @@ void rbfv2tscalcbuf(rbfv2model* s,
         rcur = s->ri.ptr.p_double[levelidx];
         invrc2 = 1/(rcur*rcur);
         rquery2 = ae_sqr(rcur*rbfv2farradius(s->bf, _state), _state);
-        rbfv2_partialcalcrec(s, buf, s->kdroots.ptr.p_int[levelidx], invrc2, rquery2, &buf->x, y, _state);
+        rbfv2_partialcalcrec(s, buf, s->kdroots.ptr.p_int[levelidx], invrc2, rquery2, &buf->x, y, y, y, 0, _state);
+    }
+}
+
+
+/*************************************************************************
+This function calculates values of the RBF model at the  given  point  and
+its derivatives, using external buffer object (internal temporaries of the
+RBF model are not modified).
+
+This function allows to use same RBF model object  in  different  threads,
+assuming  that  different   threads  use  different  instances  of  buffer
+structure.
+
+INPUT PARAMETERS:
+    S       -   RBF model, may be shared between different threads
+    Buf     -   buffer object created for this particular instance of  RBF
+                model with rbfcreatecalcbuffer().
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only 
+                leading NX will be used.
+    Y, DY   -   possibly preallocated arrays
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY]. Y is not reallocated when it
+                is larger than NY.
+    DY      -   derivatives, array[NY*NX]. DY is not reallocated when it
+                is larger than NY*NX.
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfv2tsdiffbuf(rbfv2model* s,
+     rbfv2calcbuffer* buf,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* dy,
+     ae_state *_state)
+{
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t levelidx;
+    double rcur;
+    double rquery2;
+    double invrc2;
+    ae_int_t nx;
+    ae_int_t ny;
+
+
+    ae_assert(x->cnt>=s->nx, "RBFDiffBuf: Length(X)<NX", _state);
+    ae_assert(isfinitevector(x, s->nx, _state), "RBFDiffBuf: X contains infinite or NaN values", _state);
+    nx = s->nx;
+    ny = s->ny;
+    if( y->cnt<s->ny )
+    {
+        ae_vector_set_length(y, s->ny, _state);
+    }
+    if( dy->cnt<s->ny*s->nx )
+    {
+        ae_vector_set_length(dy, s->ny*s->nx, _state);
+    }
+    
+    /*
+     * Handle linear term
+     */
+    for(i=0; i<=ny-1; i++)
+    {
+        y->ptr.p_double[i] = s->v.ptr.pp_double[i][nx];
+        for(j=0; j<=nx-1; j++)
+        {
+            y->ptr.p_double[i] = y->ptr.p_double[i]+s->v.ptr.pp_double[i][j]*x->ptr.p_double[j];
+            dy->ptr.p_double[i*nx+j] = s->v.ptr.pp_double[i][j];
+        }
+    }
+    if( s->nh==0 )
+    {
+        return;
+    }
+    
+    /*
+     * Handle nonlinear term
+     */
+    rbfv2_allocatecalcbuffer(s, buf, _state);
+    for(j=0; j<=nx-1; j++)
+    {
+        buf->x.ptr.p_double[j] = x->ptr.p_double[j]/s->s.ptr.p_double[j];
+    }
+    for(i=0; i<=ny-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            dy->ptr.p_double[i*nx+j] = dy->ptr.p_double[i*nx+j]*s->s.ptr.p_double[j];
+        }
+    }
+    for(levelidx=0; levelidx<=s->nh-1; levelidx++)
+    {
+        
+        /*
+         * Prepare fields of Buf required by PartialCalcRec()
+         */
+        buf->curdist2 = (double)(0);
+        for(j=0; j<=nx-1; j++)
+        {
+            buf->curboxmin.ptr.p_double[j] = s->kdboxmin.ptr.p_double[j];
+            buf->curboxmax.ptr.p_double[j] = s->kdboxmax.ptr.p_double[j];
+            if( ae_fp_less(buf->x.ptr.p_double[j],buf->curboxmin.ptr.p_double[j]) )
+            {
+                buf->curdist2 = buf->curdist2+ae_sqr(buf->curboxmin.ptr.p_double[j]-buf->x.ptr.p_double[j], _state);
+            }
+            else
+            {
+                if( ae_fp_greater(buf->x.ptr.p_double[j],buf->curboxmax.ptr.p_double[j]) )
+                {
+                    buf->curdist2 = buf->curdist2+ae_sqr(buf->x.ptr.p_double[j]-buf->curboxmax.ptr.p_double[j], _state);
+                }
+            }
+        }
+        
+        /*
+         * Call PartialCalcRec()
+         */
+        rcur = s->ri.ptr.p_double[levelidx];
+        invrc2 = 1/(rcur*rcur);
+        rquery2 = ae_sqr(rcur*rbfv2farradius(s->bf, _state), _state);
+        rbfv2_partialcalcrec(s, buf, s->kdroots.ptr.p_int[levelidx], invrc2, rquery2, &buf->x, y, dy, dy, 1, _state);
+    }
+    for(i=0; i<=ny-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            dy->ptr.p_double[i*nx+j] = dy->ptr.p_double[i*nx+j]/s->s.ptr.p_double[j];
+        }
+    }
+}
+
+
+/*************************************************************************
+This function calculates values of the RBF model at the  given  point  and
+its first and second derivatives, using external buffer  object  (internal
+temporaries of the RBF model are not modified).
+
+This function allows to use same RBF model object  in  different  threads,
+assuming  that  different   threads  use  different  instances  of  buffer
+structure.
+
+INPUT PARAMETERS:
+    S       -   RBF model, may be shared between different threads
+    Buf     -   buffer object created for this particular instance of  RBF
+                model with rbfcreatecalcbuffer().
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only 
+                leading NX will be used.
+    Y,DY,D2Y -  possibly preallocated arrays
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY]. Y is not reallocated when it
+                is larger than NY.
+    DY      -   derivatives, array[NY*NX]. DY is not reallocated when it
+                is larger than NY*NX.
+    D2Y     -   second derivatives, array[NY*NX*NX]
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfv2tshessbuf(rbfv2model* s,
+     rbfv2calcbuffer* buf,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* dy,
+     /* Real    */ ae_vector* d2y,
+     ae_state *_state)
+{
+    ae_int_t i;
+    ae_int_t j;
+    ae_int_t k;
+    ae_int_t levelidx;
+    double rcur;
+    double rquery2;
+    double invrc2;
+    ae_int_t nx;
+    ae_int_t ny;
+
+
+    ae_assert(x->cnt>=s->nx, "RBFDiffBuf: Length(X)<NX", _state);
+    ae_assert(isfinitevector(x, s->nx, _state), "RBFDiffBuf: X contains infinite or NaN values", _state);
+    nx = s->nx;
+    ny = s->ny;
+    if( y->cnt<s->ny )
+    {
+        ae_vector_set_length(y, s->ny, _state);
+    }
+    if( dy->cnt<s->ny*s->nx )
+    {
+        ae_vector_set_length(dy, s->ny*s->nx, _state);
+    }
+    if( d2y->cnt<ny*nx*nx )
+    {
+        ae_vector_set_length(d2y, ny*nx*nx, _state);
+    }
+    
+    /*
+     * Handle linear term
+     */
+    for(i=0; i<=ny-1; i++)
+    {
+        y->ptr.p_double[i] = s->v.ptr.pp_double[i][nx];
+        for(j=0; j<=nx-1; j++)
+        {
+            y->ptr.p_double[i] = y->ptr.p_double[i]+s->v.ptr.pp_double[i][j]*x->ptr.p_double[j];
+            dy->ptr.p_double[i*nx+j] = s->v.ptr.pp_double[i][j];
+        }
+    }
+    rsetv(ny*nx*nx, 0.0, d2y, _state);
+    if( s->nh==0 )
+    {
+        return;
+    }
+    
+    /*
+     * Handle nonlinear term
+     */
+    rbfv2_allocatecalcbuffer(s, buf, _state);
+    for(j=0; j<=nx-1; j++)
+    {
+        buf->x.ptr.p_double[j] = x->ptr.p_double[j]/s->s.ptr.p_double[j];
+    }
+    for(i=0; i<=ny-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            dy->ptr.p_double[i*nx+j] = dy->ptr.p_double[i*nx+j]*s->s.ptr.p_double[j];
+        }
+    }
+    for(levelidx=0; levelidx<=s->nh-1; levelidx++)
+    {
+        
+        /*
+         * Prepare fields of Buf required by PartialCalcRec()
+         */
+        buf->curdist2 = (double)(0);
+        for(j=0; j<=nx-1; j++)
+        {
+            buf->curboxmin.ptr.p_double[j] = s->kdboxmin.ptr.p_double[j];
+            buf->curboxmax.ptr.p_double[j] = s->kdboxmax.ptr.p_double[j];
+            if( ae_fp_less(buf->x.ptr.p_double[j],buf->curboxmin.ptr.p_double[j]) )
+            {
+                buf->curdist2 = buf->curdist2+ae_sqr(buf->curboxmin.ptr.p_double[j]-buf->x.ptr.p_double[j], _state);
+            }
+            else
+            {
+                if( ae_fp_greater(buf->x.ptr.p_double[j],buf->curboxmax.ptr.p_double[j]) )
+                {
+                    buf->curdist2 = buf->curdist2+ae_sqr(buf->x.ptr.p_double[j]-buf->curboxmax.ptr.p_double[j], _state);
+                }
+            }
+        }
+        
+        /*
+         * Call PartialCalcRec()
+         */
+        rcur = s->ri.ptr.p_double[levelidx];
+        invrc2 = 1/(rcur*rcur);
+        rquery2 = ae_sqr(rcur*rbfv2farradius(s->bf, _state), _state);
+        rbfv2_partialcalcrec(s, buf, s->kdroots.ptr.p_int[levelidx], invrc2, rquery2, &buf->x, y, dy, d2y, 2, _state);
+    }
+    for(i=0; i<=ny-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            dy->ptr.p_double[i*nx+j] = dy->ptr.p_double[i*nx+j]/s->s.ptr.p_double[j];
+        }
+    }
+    for(i=0; i<=ny-1; i++)
+    {
+        for(j=0; j<=nx-1; j++)
+        {
+            for(k=0; k<=nx-1; k++)
+            {
+                d2y->ptr.p_double[i*nx*nx+j*nx+k] = d2y->ptr.p_double[i*nx*nx+j*nx+k]/(s->s.ptr.p_double[j]*s->s.ptr.p_double[k]);
+            }
+        }
     }
 }
 
@@ -50793,7 +59330,7 @@ void rbfv2partialgridcalcrec(rbfv2model* s,
                     if( !sparsey||flagy->ptr.p_bool[srcoffs] )
                     {
                         rbfv2_preparepartialquery(&buf->tx, &s->kdboxmin, &s->kdboxmax, nx, &buf->calcbuf, &dummy, _state);
-                        rbfv2_partialcalcrec(s, &buf->calcbuf, s->kdroots.ptr.p_int[levelidx], invrc2, rquery2, &buf->tx, &buf->ty, _state);
+                        rbfv2_partialcalcrec(s, &buf->calcbuf, s->kdroots.ptr.p_int[levelidx], invrc2, rquery2, &buf->tx, &buf->ty, &buf->ty, &buf->ty, 0, _state);
                     }
                     for(l=0; l<=ny-1; l++)
                     {
@@ -51535,10 +60072,18 @@ INPUT PARAMETERS:
     InvR2   -   1/R^2, where R is basis function radius
     QueryR2 -   squared query radius, usually it is (R*FarRadius(BasisFunction))^2
     X       -   evaluation point, array[NX]
-    Y       -   partial value, array[NY]
+    Y       -   current value for target, array[NY]
+    DY      -   current value for derivative, array[NY*NX], if NeedDY>=1
+    D2Y     -   current value for derivative, array[NY*NX*NX], if NeedDY>=2
+    NeedDY  -   whether derivatives are required or not:
+                * 0 if only Y is needed
+                * 1 if Y and DY are needed
+                * 2 if Y, DY, D2Y are needed
     
 OUTPUT PARAMETERS
     Y       -   updated partial value
+    DY      -   updated derivatives, if NeedDY>=1
+    D2Y     -   updated Hessian, if NeedDY>=2
 
   -- ALGLIB --
      Copyright 20.06.2016 by Bochkanov Sergey
@@ -51550,11 +60095,18 @@ static void rbfv2_partialcalcrec(rbfv2model* s,
      double queryr2,
      /* Real    */ ae_vector* x,
      /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* dy,
+     /* Real    */ ae_vector* d2y,
+     ae_int_t needdy,
      ae_state *_state)
 {
     ae_int_t i;
     ae_int_t j;
+    ae_int_t k;
+    ae_int_t k0;
+    ae_int_t k1;
     double ptdist2;
+    double w;
     double v;
     double v0;
     double v1;
@@ -51563,6 +60115,8 @@ static void rbfv2_partialcalcrec(rbfv2model* s,
     ae_int_t itemoffs;
     double arg;
     double val;
+    double df;
+    double d2f;
     ae_int_t d;
     double split;
     ae_int_t childle;
@@ -51616,25 +60170,107 @@ static void rbfv2_partialcalcrec(rbfv2model* s,
              * Update Y
              */
             arg = ptdist2*invr2;
-            if( s->bf==0 )
+            val = (double)(0);
+            df = (double)(0);
+            d2f = (double)(0);
+            if( needdy==2 )
             {
-                val = ae_exp(-arg, _state);
-            }
-            else
-            {
-                if( s->bf==1 )
+                if( s->bf==0 )
                 {
-                    val = rbfv2basisfunc(s->bf, arg, _state);
+                    val = ae_exp(-arg, _state);
+                    df = -val;
+                    d2f = val;
                 }
                 else
                 {
-                    ae_assert(ae_false, "PartialCalcRec: integrity check failed", _state);
+                    if( s->bf==1 )
+                    {
+                        rbfv2basisfuncdiff2(s->bf, arg, &val, &df, &d2f, _state);
+                    }
+                    else
+                    {
+                        ae_assert(ae_false, "PartialCalcRec: integrity check failed", _state);
+                    }
+                }
+                for(j=0; j<=ny-1; j++)
+                {
+                    y->ptr.p_double[j] = y->ptr.p_double[j]+val*s->cw.ptr.p_double[itemoffs+nx+j];
+                    w = s->cw.ptr.p_double[itemoffs+nx+j];
+                    v = w*df*invr2*2;
+                    for(k0=0; k0<=nx-1; k0++)
+                    {
+                        for(k1=0; k1<=nx-1; k1++)
+                        {
+                            if( k0==k1 )
+                            {
+                                
+                                /*
+                                 * Compute derivative and diagonal element of the Hessian
+                                 */
+                                dy->ptr.p_double[j*nx+k0] = dy->ptr.p_double[j*nx+k0]+v*(x->ptr.p_double[k0]-s->cw.ptr.p_double[itemoffs+k0]);
+                                d2y->ptr.p_double[j*nx*nx+k0*nx+k1] = d2y->ptr.p_double[j*nx*nx+k0*nx+k1]+w*(d2f*invr2*invr2*4*ae_sqr(x->ptr.p_double[k0]-s->cw.ptr.p_double[itemoffs+k0], _state)+df*invr2*2);
+                            }
+                            else
+                            {
+                                
+                                /*
+                                 * Compute offdiagonal element of the Hessian
+                                 */
+                                d2y->ptr.p_double[j*nx*nx+k0*nx+k1] = d2y->ptr.p_double[j*nx*nx+k0*nx+k1]+w*d2f*invr2*invr2*4*(x->ptr.p_double[k0]-s->cw.ptr.p_double[itemoffs+k0])*(x->ptr.p_double[k1]-s->cw.ptr.p_double[itemoffs+k1]);
+                            }
+                        }
+                    }
                 }
             }
-            itemoffs = itemoffs+nx;
-            for(j=0; j<=ny-1; j++)
+            if( needdy==1 )
             {
-                y->ptr.p_double[j] = y->ptr.p_double[j]+val*s->cw.ptr.p_double[itemoffs+j];
+                if( s->bf==0 )
+                {
+                    val = ae_exp(-arg, _state);
+                    df = -val;
+                }
+                else
+                {
+                    if( s->bf==1 )
+                    {
+                        rbfv2basisfuncdiff2(s->bf, arg, &val, &df, &d2f, _state);
+                    }
+                    else
+                    {
+                        ae_assert(ae_false, "PartialCalcRec: integrity check failed", _state);
+                    }
+                }
+                for(j=0; j<=ny-1; j++)
+                {
+                    y->ptr.p_double[j] = y->ptr.p_double[j]+val*s->cw.ptr.p_double[itemoffs+nx+j];
+                    v = s->cw.ptr.p_double[itemoffs+nx+j]*df*invr2*2;
+                    for(k=0; k<=nx-1; k++)
+                    {
+                        dy->ptr.p_double[j*nx+k] = dy->ptr.p_double[j*nx+k]+v*(x->ptr.p_double[k]-s->cw.ptr.p_double[itemoffs+k]);
+                    }
+                }
+            }
+            if( needdy==0 )
+            {
+                if( s->bf==0 )
+                {
+                    val = ae_exp(-arg, _state);
+                }
+                else
+                {
+                    if( s->bf==1 )
+                    {
+                        val = rbfv2basisfunc(s->bf, arg, _state);
+                    }
+                    else
+                    {
+                        ae_assert(ae_false, "PartialCalcRec: integrity check failed", _state);
+                    }
+                }
+                for(j=0; j<=ny-1; j++)
+                {
+                    y->ptr.p_double[j] = y->ptr.p_double[j]+val*s->cw.ptr.p_double[itemoffs+nx+j];
+                }
             }
         }
         return;
@@ -51720,7 +60356,7 @@ static void rbfv2_partialcalcrec(rbfv2model* s,
              */
             if( buf->curdist2<queryr2 )
             {
-                rbfv2_partialcalcrec(s, buf, childoffs, invr2, queryr2, x, y, _state);
+                rbfv2_partialcalcrec(s, buf, childoffs, invr2, queryr2, x, y, dy, d2y, needdy, _state);
             }
             
             /*
@@ -54706,30 +63342,28 @@ rbfbuildmodel() which will update model according to your specification.
 
 USAGE:
 1. User creates model with rbfcreate()
-2. User adds dataset with rbfsetpoints() (points do NOT have to  be  on  a
-   regular grid) or rbfsetpointsandscales().
-3. (OPTIONAL) User chooses polynomial term by calling:
-   * rbflinterm() to set linear term
+2. User adds dataset with rbfsetpoints() or rbfsetpointsandscales()
+3. User selects RBF solver by calling:
+   * rbfsetalgohierarchical() - for a HRBF solver,  a  hierarchical large-
+     scale Gaussian RBFs  (works  well  for  uniformly  distributed  point
+     clouds, but may fail when the data are non-uniform; use other solvers
+     below in such cases)
+   * rbfsetalgothinplatespline() - for a large-scale DDM-RBF  solver  with
+     thin plate spline basis function being used
+   * rbfsetalgobiharmonic() -  for  a  large-scale  DDM-RBF  solver   with
+     biharmonic basis function being used
+   * rbfsetalgomultiquadricauto() -  for a large-scale DDM-RBF solver with
+     multiquadric basis function being used (automatic  selection  of  the
+     scale parameter Alpha)
+   * rbfsetalgomultiquadricmanual() -  for a  large-scale  DDM-RBF  solver
+     with multiquadric basis function being used (manual selection  of the
+     scale parameter Alpha)
+4. (OPTIONAL) User chooses polynomial term by calling:
+   * rbflinterm() to set linear term (default)
    * rbfconstterm() to set constant term
    * rbfzeroterm() to set zero term
-   By default, linear term is used.
-4. User tweaks algorithm properties with  rbfsetalgohierarchical()  method
-   (or chooses one of the legacy algorithms - QNN  (rbfsetalgoqnn)  or  ML
-   (rbfsetalgomultilayer)).
 5. User calls rbfbuildmodel() function which rebuilds model  according  to
    the specification
-6. User may call rbfcalc() to calculate model value at the specified point,
-   rbfgridcalc() to  calculate   model  values at the points of the regular
-   grid. User may extract model coefficients with rbfunpack() call.
-   
-IMPORTANT: we recommend you to use latest model construction  algorithm  -
-           hierarchical RBFs, which is activated by rbfsetalgohierarchical()
-           function. This algorithm is the fastest one, and  most  memory-
-           efficient.
-           However,  it  is  incompatible  with older versions  of  ALGLIB
-           (pre-3.11). So, if you serialize hierarchical model,  you  will
-           be unable to load it in pre-3.11 ALGLIB. Other model types (QNN
-           and RBF-ML) are still backward-compatible.
    
 INPUT PARAMETERS:
     NX      -   dimension of the space, NX>=1
@@ -54741,26 +63375,9 @@ OUTPUT PARAMETERS:
 NOTE 1: memory requirements. RBF models require amount of memory  which is
         proportional  to the number of data points. Some additional memory
         is allocated during model construction, but most of this memory is
-        freed after model coefficients  are  calculated.  Amount  of  this
-        additional memory depends on model  construction  algorithm  being
-        used.
-        
-NOTE 2: prior to ALGLIB version 3.11, RBF models supported  only  NX=2  or
-        NX=3. Any  attempt  to  create  single-dimensional  or  more  than
-        3-dimensional RBF model resulted in exception.
-        
-        ALGLIB 3.11 supports any NX>0, but models created with  NX!=2  and
-        NX!=3 are incompatible with (a) older versions of ALGLIB, (b)  old
-        model construction algorithms (QNN or RBF-ML).
-        
-        So, if you create a model with NX=2 or NX=3,  then,  depending  on
-        specific  model construction algorithm being chosen, you will (QNN
-        and RBF-ML) or will not (HierarchicalRBF) get backward compatibility
-        with older versions of ALGLIB. You have a choice here.
-        
-        However, if you create a model with NX neither 2 nor 3,  you  have
-        no backward compatibility from the start, and you  are  forced  to
-        use hierarchical RBFs and ALGLIB 3.11 or later.
+        freed after the model  coefficients  are   calculated.  Amount  of
+        this additional memory depends  on  model  construction  algorithm
+        being used.
 
   -- ALGLIB --
      Copyright 13.12.2011, 20.06.2016 by Bochkanov Sergey
@@ -54785,6 +63402,7 @@ void rbfcreate(ae_int_t nx, ae_int_t ny, rbfmodel* s, ae_state *_state)
      */
     rbf_initializev1(nx, ny, &s->model1, _state);
     rbf_initializev2(nx, ny, &s->model2, _state);
+    rbf_initializev3(nx, ny, &s->model3, _state);
     if( nx==2||nx==3 )
     {
         s->modelversion = 1;
@@ -54799,6 +63417,11 @@ void rbfcreate(ae_int_t nx, ae_int_t ny, rbfmodel* s, ae_state *_state)
      */
     s->progress10000 = 0;
     s->terminationrequest = ae_false;
+    
+    /*
+     * Prepare buffers
+     */
+    rbfcreatecalcbuffer(s, &s->calcbuf, _state);
 }
 
 
@@ -54806,11 +63429,21 @@ void rbfcreate(ae_int_t nx, ae_int_t ny, rbfmodel* s, ae_state *_state)
 This function creates buffer  structure  which  can  be  used  to  perform
 parallel  RBF  model  evaluations  (with  one  RBF  model  instance  being
 used from multiple threads, as long as  different  threads  use  different
-instances of buffer).
+instances of the buffer).
 
 This buffer object can be used with  rbftscalcbuf()  function  (here  "ts"
 stands for "thread-safe", "buf" is a suffix which denotes  function  which
 reuses previously allocated output space).
+
+A buffer creation function (this function) is also thread-safe.  I.e.  you
+may safely create multiple buffers for the same  RBF  model  from multiple
+threads.
+
+NOTE: the  buffer  object  is  just  a  collection of several preallocated
+      dynamic arrays and precomputed values. If you  delete  its  "parent"
+      RBF model when the buffer is still alive, nothing  bad  will  happen
+      (no dangling pointers or resource leaks).  The  buffer  will  simply
+      become useless.
 
 How to use it:
 * create RBF model structure with rbfcreate()
@@ -54821,13 +63454,15 @@ How to use it:
   for more information)
 * call rbftscalcbuf() from different threads,  with  each  thread  working
   with its own copy of buffer object.
+* it is recommended to reuse buffer as much  as  possible  because  buffer
+  creation involves allocation of several large dynamic arrays.  It  is  a
+  huge waste of resource to use it just once.
 
 INPUT PARAMETERS
     S           -   RBF model
 
 OUTPUT PARAMETERS
     Buf         -   external buffer.
-    
     
 IMPORTANT: buffer object should be used only with  RBF model object  which
            was used to initialize buffer. Any attempt to use buffer   with
@@ -54862,6 +63497,12 @@ void rbfcreatecalcbuffer(rbfmodel* s,
     {
         buf->modelversion = 2;
         rbfv2createcalcbuffer(&s->model2, &buf->bufv2, _state);
+        return;
+    }
+    if( s->modelversion==3 )
+    {
+        buf->modelversion = 3;
+        rbfv3createcalcbuffer(&s->model3, &buf->bufv3, _state);
         return;
     }
     ae_assert(ae_false, "RBFCreateCalcBuffer: integrity check failed", _state);
@@ -54918,7 +63559,7 @@ void rbfsetpoints(rbfmodel* s,
     ae_int_t j;
 
 
-    ae_assert(n>0, "RBFSetPoints: N<0", _state);
+    ae_assert(n>0, "RBFSetPoints: N<=0", _state);
     ae_assert(xy->rows>=n, "RBFSetPoints: Rows(XY)<N", _state);
     ae_assert(xy->cols>=s->nx+s->ny, "RBFSetPoints: Cols(XY)<NX+NY", _state);
     ae_assert(apservisfinitematrix(xy, n, s->nx+s->ny, _state), "RBFSetPoints: XY contains infinite or NaN values!", _state);
@@ -54952,14 +63593,9 @@ scale vector.
 This function overrides results of the previous calls, i.e. multiple calls
 of this function will result in only the last set being added.
 
-IMPORTANT: only HierarchicalRBF algorithm can work with scaled points. So,
-           using this function results in RBF models which can be used  in
-           ALGLIB 3.11 or later. Previous versions of the library will  be
-           unable  to unserialize models produced by HierarchicalRBF algo.
-           
-           Any attempt to use this function with RBF-ML or QNN  algorithms
-           will result  in  -3  error  code   being   returned  (incorrect
-           algorithm).
+IMPORTANT: only modern RBF algorithms  support  variable  scaling.  Legacy
+           algorithms like RBF-ML or QNN algorithms  will  result  in   -3
+           completion code being returned (incorrect algorithm).
 
 INPUT PARAMETERS:
     R       -   RBF model, initialized by rbfcreate() call.
@@ -55000,7 +63636,7 @@ void rbfsetpointsandscales(rbfmodel* r,
     ae_int_t j;
 
 
-    ae_assert(n>0, "RBFSetPointsAndScales: N<0", _state);
+    ae_assert(n>0, "RBFSetPointsAndScales: N<=0", _state);
     ae_assert(xy->rows>=n, "RBFSetPointsAndScales: Rows(XY)<N", _state);
     ae_assert(xy->cols>=r->nx+r->ny, "RBFSetPointsAndScales: Cols(XY)<NX+NY", _state);
     ae_assert(s->cnt>=r->nx, "RBFSetPointsAndScales: Length(S)<NX", _state);
@@ -55030,62 +63666,9 @@ void rbfsetpointsandscales(rbfmodel* r,
 
 
 /*************************************************************************
-DEPRECATED:since version 3.11 ALGLIB includes new RBF  model  construction
-           algorithm, Hierarchical  RBF.  This  algorithm  is  faster  and
-           requires less memory than QNN and RBF-ML. It is especially good
-           for large-scale interpolation problems. So, we recommend you to
-           consider Hierarchical RBF as default option.
-           
-==========================================================================
-
-This  function  sets  RBF interpolation algorithm. ALGLIB supports several
-RBF algorithms with different properties.
-
-This algorithm is called RBF-QNN and  it  is  good  for  point  sets  with
-following properties:
-a) all points are distinct
-b) all points are well separated.
-c) points  distribution  is  approximately  uniform.  There is no "contour
-   lines", clusters of points, or other small-scale structures.
-
-Algorithm description:
-1) interpolation centers are allocated to data points
-2) interpolation radii are calculated as distances to the  nearest centers
-   times Q coefficient (where Q is a value from [0.75,1.50]).
-3) after  performing (2) radii are transformed in order to avoid situation
-   when single outlier has very large radius and  influences  many  points
-   across all dataset. Transformation has following form:
-       new_r[i] = min(r[i],Z*median(r[]))
-   where r[i] is I-th radius, median()  is a median  radius across  entire
-   dataset, Z is user-specified value which controls amount  of  deviation
-   from median radius.
-
-When (a) is violated,  we  will  be unable to build RBF model. When (b) or
-(c) are violated, model will be built, but interpolation quality  will  be
-low. See http://www.alglib.net/interpolation/ for more information on this
-subject.
-
-This algorithm is used by default.
-
-Additional Q parameter controls smoothness properties of the RBF basis:
-* Q<0.75 will give perfectly conditioned basis,  but  terrible  smoothness
-  properties (RBF interpolant will have sharp peaks around function values)
-* Q around 1.0 gives good balance between smoothness and condition number
-* Q>1.5 will lead to badly conditioned systems and slow convergence of the
-  underlying linear solver (although smoothness will be very good)
-* Q>2.0 will effectively make optimizer useless because it won't  converge
-  within reasonable amount of iterations. It is possible to set such large
-  Q, but it is advised not to do so.
-
-INPUT PARAMETERS:
-    S       -   RBF model, initialized by RBFCreate() call
-    Q       -   Q parameter, Q>0, recommended value - 1.0
-    Z       -   Z parameter, Z>0, recommended value - 5.0
-
-NOTE: this   function  has   some   serialization-related  subtleties.  We
-      recommend you to study serialization examples from ALGLIB  Reference
-      Manual if you want to perform serialization of your models.
-
+DEPRECATED: this function is deprecated. ALGLIB  includes  new  RBF  model
+            construction algorithms: DDM-RBF (since version 3.19) and HRBF
+            (since version 3.11).
 
   -- ALGLIB --
      Copyright 13.12.2011 by Bochkanov Sergey
@@ -55105,99 +63688,9 @@ void rbfsetalgoqnn(rbfmodel* s, double q, double z, ae_state *_state)
 
 
 /*************************************************************************
-DEPRECATED:since version 3.11 ALGLIB includes new RBF  model  construction
-           algorithm, Hierarchical  RBF.  This  algorithm  is  faster  and
-           requires less memory than QNN and RBF-ML. It is especially good
-           for large-scale interpolation problems. So, we recommend you to
-           consider Hierarchical RBF as default option.
-           
-==========================================================================
-
-This  function  sets  RBF interpolation algorithm. ALGLIB supports several
-RBF algorithms with different properties.
-
-This  algorithm is called RBF-ML. It builds  multilayer  RBF  model,  i.e.
-model with subsequently decreasing  radii,  which  allows  us  to  combine
-smoothness (due to  large radii of  the first layers) with  exactness (due
-to small radii of the last layers) and fast convergence.
-
-Internally RBF-ML uses many different  means  of acceleration, from sparse
-matrices  to  KD-trees,  which  results in algorithm whose working time is
-roughly proportional to N*log(N)*Density*RBase^2*NLayers,  where  N  is  a
-number of points, Density is an average density if points per unit of  the
-interpolation space, RBase is an initial radius, NLayers is  a  number  of
-layers.
-
-RBF-ML is good for following kinds of interpolation problems:
-1. "exact" problems (perfect fit) with well separated points
-2. least squares problems with arbitrary distribution of points (algorithm
-   gives  perfect  fit  where it is possible, and resorts to least squares
-   fit in the hard areas).
-3. noisy problems where  we  want  to  apply  some  controlled  amount  of
-   smoothing.
-
-INPUT PARAMETERS:
-    S       -   RBF model, initialized by RBFCreate() call
-    RBase   -   RBase parameter, RBase>0
-    NLayers -   NLayers parameter, NLayers>0, recommended value  to  start
-                with - about 5.
-    LambdaV -   regularization value, can be useful when  solving  problem
-                in the least squares sense.  Optimal  lambda  is  problem-
-                dependent and require trial and error. In our  experience,
-                good lambda can be as large as 0.1, and you can use  0.001
-                as initial guess.
-                Default  value  - 0.01, which is used when LambdaV is  not
-                given.  You  can  specify  zero  value,  but  it  is   not
-                recommended to do so.
-
-TUNING ALGORITHM
-
-In order to use this algorithm you have to choose three parameters:
-* initial radius RBase
-* number of layers in the model NLayers
-* regularization coefficient LambdaV
-
-Initial radius is easy to choose - you can pick any number  several  times
-larger  than  the  average  distance between points. Algorithm won't break
-down if you choose radius which is too large (model construction time will
-increase, but model will be built correctly).
-
-Choose such number of layers that RLast=RBase/2^(NLayers-1)  (radius  used
-by  the  last  layer)  will  be  smaller than the typical distance between
-points.  In  case  model  error  is  too large, you can increase number of
-layers.  Having  more  layers  will make model construction and evaluation
-proportionally slower, but it will allow you to have model which precisely
-fits your data. From the other side, if you want to  suppress  noise,  you
-can DECREASE number of layers to make your model less flexible.
-
-Regularization coefficient LambdaV controls smoothness of  the  individual
-models built for each layer. We recommend you to use default value in case
-you don't want to tune this parameter,  because  having  non-zero  LambdaV
-accelerates and stabilizes internal iterative algorithm. In case you  want
-to suppress noise you can use  LambdaV  as  additional  parameter  (larger
-value = more smoothness) to tune.
-
-TYPICAL ERRORS
-
-1. Using  initial  radius  which is too large. Memory requirements  of the
-   RBF-ML are roughly proportional to N*Density*RBase^2 (where Density  is
-   an average density of points per unit of the interpolation  space).  In
-   the extreme case of the very large RBase we will need O(N^2)  units  of
-   memory - and many layers in order to decrease radius to some reasonably
-   small value.
-
-2. Using too small number of layers - RBF models with large radius are not
-   flexible enough to reproduce small variations in the  target  function.
-   You  need  many  layers  with  different radii, from large to small, in
-   order to have good model.
-
-3. Using  initial  radius  which  is  too  small.  You will get model with
-   "holes" in the areas which are too far away from interpolation centers.
-   However, algorithm will work correctly (and quickly) in this case.
-
-4. Using too many layers - you will get too large and too slow model. This
-   model  will  perfectly  reproduce  your function, but maybe you will be
-   able to achieve similar results with less layers (and less memory).
+DEPRECATED: this function is deprecated. ALGLIB  includes  new  RBF  model
+            construction algorithms: DDM-RBF (since version 3.19) and HRBF
+            (since version 3.11).
    
   -- ALGLIB --
      Copyright 02.03.2012 by Bochkanov Sergey
@@ -55223,8 +63716,7 @@ void rbfsetalgomultilayer(rbfmodel* s,
 
 
 /*************************************************************************
-This  function  sets  RBF interpolation algorithm. ALGLIB supports several
-RBF algorithms with different properties.
+This function chooses HRBF solver, a 2nd version of ALGLIB RBFs.
 
 This  algorithm is called Hierarchical RBF. It  similar  to  its  previous
 incarnation, RBF-ML, i.e.  it  also  builds  a  sequence  of  models  with
@@ -55235,22 +63727,16 @@ and evaluation, as well as smaller memory footprint during construction.
 This algorithm has following important features:
 * ability to handle millions of points
 * controllable smoothing via nonlinearity penalization
-* support for NX-dimensional models with NX=1 or NX>3 (unlike QNN or RBF-ML)
 * support for specification of per-dimensional  radii  via  scale  vector,
   which is set by means of rbfsetpointsandscales() function. This  feature
   is useful if you solve  spatio-temporal  interpolation  problems,  where
   different radii are required for spatial and temporal dimensions.
 
 Running times are roughly proportional to:
-* N*log(N)*NLayers - for model construction
-* N*NLayers - for model evaluation
+* N*log(N)*NLayers - for the model construction
+* N*NLayers - for the model evaluation
 You may see that running time does not depend on search radius  or  points
-density, just on number of layers in the hierarchy.
-
-IMPORTANT: this model construction algorithm was introduced in ALGLIB 3.11
-           and  produces  models  which  are  INCOMPATIBLE  with  previous
-           versions of ALGLIB. You can  not  unserialize  models  produced
-           with this function in ALGLIB 3.10 or earlier.
+density, just on the number of layers in the hierarchy.
 
 INPUT PARAMETERS:
     S       -   RBF model, initialized by rbfcreate() call
@@ -55333,16 +63819,300 @@ void rbfsetalgohierarchical(rbfmodel* s,
 
 
 /*************************************************************************
+This function chooses a thin plate  spline  DDM-RBF  solver,  a  fast  RBF
+solver with f(r)=r^2*ln(r) basis function.
+
+This algorithm has following important features:
+* easy setup - no tunable parameters
+* C1 continuous RBF model (gradient is defined everywhere, but Hessian  is
+  undefined at nodes), high-quality interpolation
+* fast  model construction algorithm with O(N) memory and  O(N^2)  running
+  time requirements. Hundreds of thousands of points can be  handled  with
+  this algorithm.
+* controllable smoothing via optional nonlinearity penalty
+
+INPUT PARAMETERS:
+    S       -   RBF model, initialized by rbfcreate() call
+    LambdaV -   smoothing parameter, LambdaV>=0, defaults to 0.0:
+                * LambdaV=0 means that no smoothing is applied,  i.e.  the
+                  spline tries to pass through all dataset points exactly
+                * LambdaV>0 means that a smoothing thin  plate  spline  is
+                  built, with larger LambdaV corresponding to models  with
+                  less nonlinearities. Smoothing spline reproduces  target
+                  values at nodes with small error; from the  other  side,
+                  it is much more stable.
+                  Recommended values:
+                  * 1.0E-6 for minimal stability improving smoothing
+                  * 1.0E-3 a good value to start experiments; first results
+                    are visible
+                  * 1.0 for strong smoothing
+
+IMPORTANT: this model construction algorithm was introduced in ALGLIB 3.19
+           and  produces  models  which  are  INCOMPATIBLE  with  previous
+           versions of ALGLIB. You can  not  unserialize  models  produced
+           with this function in ALGLIB 3.18 or earlier.
+           
+NOTE:      polyharmonic RBFs, including thin plate splines,  are  somewhat
+           slower than compactly supported RBFs built with  HRBF algorithm
+           due to the fact that non-compact basis function does not vanish
+           far away from the nodes. From the other side, polyharmonic RBFs
+           often produce much better results than HRBFs.
+
+NOTE:      this algorithm supports specification of per-dimensional  radii
+           via scale vector, which is set by means of rbfsetpointsandscales()
+           function. This feature is useful if  you solve  spatio-temporal
+           interpolation problems where different radii are  required  for
+           spatial and temporal dimensions.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfsetalgothinplatespline(rbfmodel* s,
+     double lambdav,
+     ae_state *_state)
+{
+
+
+    ae_assert(ae_isfinite(lambdav, _state), "RBFSetAlgoThinPlateSpline: LambdaV is not finite number", _state);
+    ae_assert(ae_fp_greater_eq(lambdav,(double)(0)), "RBFSetAlgoThinPlateSpline: LambdaV is negative", _state);
+    s->algorithmtype = 4;
+    s->bftype = 2;
+    s->bfparam = (double)(0);
+    s->lambdav = lambdav;
+}
+
+
+/*************************************************************************
+This function chooses a multiquadric DDM-RBF solver,  a  fast  RBF  solver
+with f(r)=sqrt(r^2+Alpha^2) as a basis function,  with  manual  choice  of
+the scale parameter Alpha.
+
+This algorithm has following important features:
+* C2 continuous RBF model (when Alpha>0 is used; for Alpha=0 the model  is
+  merely C0 continuous)
+* fast  model construction algorithm with O(N) memory and  O(N^2)  running
+  time requirements. Hundreds of thousands of points can be  handled  with
+  this algorithm.
+* controllable smoothing via optional nonlinearity penalty
+  
+One important point is that  this  algorithm  includes  tunable  parameter
+Alpha, which should be carefully chosen. Selecting too  large  value  will
+result in extremely badly  conditioned  problems  (interpolation  accuracy
+may degrade up to complete breakdown) whilst selecting too small value may
+produce models that are precise but nearly nonsmooth at the nodes.
+
+Good value to  start  from  is  mean  distance  between  nodes. Generally,
+choosing too small Alpha is better than choosing too large - in the former
+case you still have model that reproduces target values at the nodes.
+
+In most cases, better option is to choose good Alpha automatically - it is
+done by another version of the same algorithm that is activated by calling
+rbfsetalgomultiquadricauto() method.
+
+INPUT PARAMETERS:
+    S       -   RBF model, initialized by rbfcreate() call
+    Alpha   -   basis function parameter, Alpha>=0:
+                * Alpha>0  means that multiquadric algorithm is used which
+                  produces C2-continuous RBF model
+                * Alpha=0  means that the multiquadric kernel  effectively
+                  becomes a biharmonic one: f=r. As a  result,  the  model
+                  becomes nonsmooth at nodes, and hence is C0 continuous
+    LambdaV -   smoothing parameter, LambdaV>=0, defaults to 0.0:
+                * LambdaV=0 means that no smoothing is applied,  i.e.  the
+                  spline tries to pass through all dataset points exactly
+                * LambdaV>0 means that a multiquadric spline is built with
+                  larger  LambdaV   corresponding   to  models  with  less
+                  nonlinearities.  Smoothing   spline   reproduces  target
+                  values at nodes with small error; from the  other  side,
+                  it is much more stable.
+                  Recommended values:
+                  * 1.0E-6 for minimal stability improving smoothing
+                  * 1.0E-3 a good value to start experiments; first results
+                    are visible
+                  * 1.0 for strong smoothing
+
+IMPORTANT: this model construction algorithm was introduced in ALGLIB 3.19
+           and  produces  models  which  are  INCOMPATIBLE  with  previous
+           versions of ALGLIB. You can  not  unserialize  models  produced
+           with this function in ALGLIB 3.18 or earlier.
+           
+NOTE:      polyharmonic RBFs, including thin plate splines,  are  somewhat
+           slower than compactly supported RBFs built with  HRBF algorithm
+           due to the fact that non-compact basis function does not vanish
+           far away from the nodes. From the other side, polyharmonic RBFs
+           often produce much better results than HRBFs.
+
+NOTE:      this algorithm supports specification of per-dimensional  radii
+           via scale vector, which is set by means of rbfsetpointsandscales()
+           function. This feature is useful if  you solve  spatio-temporal
+           interpolation problems where different radii are  required  for
+           spatial and temporal dimensions.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfsetalgomultiquadricmanual(rbfmodel* s,
+     double alpha,
+     double lambdav,
+     ae_state *_state)
+{
+
+
+    ae_assert(ae_isfinite(alpha, _state), "RBFSetAlgoMultiquadricManual: Alpha is infinite or NAN", _state);
+    ae_assert(ae_fp_greater_eq(alpha,(double)(0)), "RBFSetAlgoMultiquadricManual: Alpha<0", _state);
+    ae_assert(ae_isfinite(lambdav, _state), "RBFSetAlgoMultiquadricManual: LambdaV is not finite number", _state);
+    ae_assert(ae_fp_greater_eq(lambdav,(double)(0)), "RBFSetAlgoMultiquadricManual: LambdaV is negative", _state);
+    s->algorithmtype = 4;
+    s->bftype = 1;
+    s->bfparam = alpha;
+    s->lambdav = lambdav;
+}
+
+
+/*************************************************************************
+This function chooses a multiquadric DDM-RBF solver,  a  fast  RBF  solver
+with f(r)=sqrt(r^2+Alpha^2)  as  a  basis  function,  with   Alpha   being
+automatically determined.
+
+This algorithm has following important features:
+* easy setup - no need to tune Alpha, good value is automatically assigned
+* C2 continuous RBF model
+* fast  model construction algorithm with O(N) memory and  O(N^2)  running
+  time requirements. Hundreds of thousands of points can be  handled  with
+  this algorithm.
+* controllable smoothing via optional nonlinearity penalty
+
+This algorithm automatically selects Alpha  as  a  mean  distance  to  the
+nearest neighbor (ignoring neighbors that are too close).
+
+INPUT PARAMETERS:
+    S       -   RBF model, initialized by rbfcreate() call
+    LambdaV -   smoothing parameter, LambdaV>=0, defaults to 0.0:
+                * LambdaV=0 means that no smoothing is applied,  i.e.  the
+                  spline tries to pass through all dataset points exactly
+                * LambdaV>0 means that a multiquadric spline is built with
+                  larger  LambdaV   corresponding   to  models  with  less
+                  nonlinearities.  Smoothing   spline   reproduces  target
+                  values at nodes with small error; from the  other  side,
+                  it is much more stable.
+                  Recommended values:
+                  * 1.0E-6 for minimal stability improving smoothing
+                  * 1.0E-3 a good value to start experiments; first results
+                    are visible
+                  * 1.0 for strong smoothing
+
+IMPORTANT: this model construction algorithm was introduced in ALGLIB 3.19
+           and  produces  models  which  are  INCOMPATIBLE  with  previous
+           versions of ALGLIB. You can  not  unserialize  models  produced
+           with this function in ALGLIB 3.18 or earlier.
+           
+NOTE:      polyharmonic RBFs, including thin plate splines,  are  somewhat
+           slower than compactly supported RBFs built with  HRBF algorithm
+           due to the fact that non-compact basis function does not vanish
+           far away from the nodes. From the other side, polyharmonic RBFs
+           often produce much better results than HRBFs.
+
+NOTE:      this algorithm supports specification of per-dimensional  radii
+           via scale vector, which is set by means of rbfsetpointsandscales()
+           function. This feature is useful if  you solve  spatio-temporal
+           interpolation problems where different radii are  required  for
+           spatial and temporal dimensions.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfsetalgomultiquadricauto(rbfmodel* s,
+     double lambdav,
+     ae_state *_state)
+{
+
+
+    ae_assert(ae_isfinite(lambdav, _state), "RBFSetAlgoMultiquadricAuto: LambdaV is not finite number", _state);
+    ae_assert(ae_fp_greater_eq(lambdav,(double)(0)), "RBFSetAlgoMultiquadricAuto: LambdaV is negative", _state);
+    s->algorithmtype = 4;
+    s->bftype = 1;
+    s->bfparam = -1.0;
+    s->lambdav = lambdav;
+}
+
+
+/*************************************************************************
+This  function  chooses  a  biharmonic DDM-RBF solver, a fast  RBF  solver
+with f(r)=r as a basis function.
+
+This algorithm has following important features:
+* no tunable parameters
+* C0 continuous RBF model (the model has discontinuous derivatives at  the
+  interpolation nodes)
+* fast  model construction algorithm with O(N) memory and  O(N^2)  running
+  time requirements. Hundreds of thousands of points can be  handled  with
+  this algorithm.
+* controllable smoothing via optional nonlinearity penalty
+
+INPUT PARAMETERS:
+    S       -   RBF model, initialized by rbfcreate() call
+    LambdaV -   smoothing parameter, LambdaV>=0, defaults to 0.0:
+                * LambdaV=0 means that no smoothing is applied,  i.e.  the
+                  spline tries to pass through all dataset points exactly
+                * LambdaV>0 means that a multiquadric spline is built with
+                  larger  LambdaV   corresponding   to  models  with  less
+                  nonlinearities.  Smoothing   spline   reproduces  target
+                  values at nodes with small error; from the  other  side,
+                  it is much more stable.
+                  Recommended values:
+                  * 1.0E-6 for minimal stability improving smoothing
+                  * 1.0E-3 a good value to start experiments; first results
+                    are visible
+                  * 1.0 for strong smoothing
+
+IMPORTANT: this model construction algorithm was introduced in ALGLIB 3.19
+           and  produces  models  which  are  INCOMPATIBLE  with  previous
+           versions of ALGLIB. You can  not  unserialize  models  produced
+           with this function in ALGLIB 3.18 or earlier.
+           
+NOTE:      polyharmonic RBFs, including thin plate splines,  are  somewhat
+           slower than compactly supported RBFs built with  HRBF algorithm
+           due to the fact that non-compact basis function does not vanish
+           far away from the nodes. From the other side, polyharmonic RBFs
+           often produce much better results than HRBFs.
+
+NOTE:      this algorithm supports specification of per-dimensional  radii
+           via scale vector, which is set by means of rbfsetpointsandscales()
+           function. This feature is useful if  you solve  spatio-temporal
+           interpolation problems where different radii are  required  for
+           spatial and temporal dimensions.
+
+  -- ALGLIB --
+     Copyright 12.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfsetalgobiharmonic(rbfmodel* s, double lambdav, ae_state *_state)
+{
+
+
+    ae_assert(ae_isfinite(lambdav, _state), "RBFSetAlgoBiharmonic: LambdaV is not finite number", _state);
+    ae_assert(ae_fp_greater_eq(lambdav,(double)(0)), "RBFSetAlgoBiharmonic: LambdaV is negative", _state);
+    s->algorithmtype = 4;
+    s->bftype = 1;
+    s->bfparam = (double)(0);
+    s->lambdav = lambdav;
+}
+
+
+/*************************************************************************
 This function sets linear term (model is a sum of radial  basis  functions
 plus linear polynomial). This function won't have effect until  next  call 
 to RBFBuildModel().
 
+Using linear term is a default option and it is the best one - it provides
+best convergence guarantees for all RBF model  types: legacy  RBF-QNN  and
+RBF-ML, Gaussian HRBFs and all types of DDM-RBF models.
+
+Other options, like constant or zero term, work for HRBFs,  almost  always
+work for DDM-RBFs but provide no stability  guarantees  in the latter case
+(e.g. the solver may fail on some carefully prepared problems).
+
 INPUT PARAMETERS:
     S       -   RBF model, initialized by RBFCreate() call
-
-NOTE: this   function  has   some   serialization-related  subtleties.  We
-      recommend you to study serialization examples from ALGLIB  Reference
-      Manual if you want to perform serialization of your models.
 
   -- ALGLIB --
      Copyright 13.12.2011 by Bochkanov Sergey
@@ -55360,12 +64130,14 @@ This function sets constant term (model is a sum of radial basis functions
 plus constant).  This  function  won't  have  effect  until  next  call to 
 RBFBuildModel().
 
+IMPORTANT: thin plate splines require  polynomial term to be  linear,  not
+           constant,  in  order  to  provide   interpolation   guarantees.
+           Although  failures  are  exceptionally  rare,  some  small  toy
+           problems may result in degenerate linear systems. Thus,  it  is
+           advised to use linear term when one fits data with TPS.
+
 INPUT PARAMETERS:
     S       -   RBF model, initialized by RBFCreate() call
-
-NOTE: this   function  has   some   serialization-related  subtleties.  We
-      recommend you to study serialization examples from ALGLIB  Reference
-      Manual if you want to perform serialization of your models.
 
   -- ALGLIB --
      Copyright 13.12.2011 by Bochkanov Sergey
@@ -55383,12 +64155,20 @@ This  function  sets  zero  term (model is a sum of radial basis functions
 without polynomial term). This function won't have effect until next  call
 to RBFBuildModel().
 
+IMPORTANT: only  Gaussian  RBFs  (HRBF  algorithm)  provide  interpolation
+           guarantees when no polynomial term is used.  Most  other  RBFs,
+           including   biharmonic  splines,   thin   plate   splines   and
+           multiquadrics, require at least constant term  (biharmonic  and
+           multiquadric) or linear one (thin plate splines)  in  order  to
+           guarantee non-degeneracy of linear systems being solved.
+           
+           Although  failures  are  exceptionally  rare,  some  small  toy
+           problems still may result in degenerate linear systems. Thus,it
+           is advised to use constant/linear term, unless one is 100% sure
+           that he needs zero term.
+
 INPUT PARAMETERS:
     S       -   RBF model, initialized by RBFCreate() call
-
-NOTE: this   function  has   some   serialization-related  subtleties.  We
-      recommend you to study serialization examples from ALGLIB  Reference
-      Manual if you want to perform serialization of your models.
 
   -- ALGLIB --
      Copyright 13.12.2011 by Bochkanov Sergey
@@ -55569,8 +64349,9 @@ INPUT PARAMETERS:
                   * -4 - nonconvergence of the internal SVD solver
                   * -3   incorrect model construction algorithm was chosen:
                          QNN or RBF-ML, combined with one of the incompatible
-                         features - NX=1 or NX>3; points with per-dimension
-                         scales.
+                         features:
+                         * NX=1 or NX>3
+                         * points with per-dimension scales.
                   *  1 - successful termination
                   *  8 - a termination request was submitted via
                          rbfrequesttermination() function.
@@ -55600,19 +64381,24 @@ void rbfbuildmodel(rbfmodel* s, rbfreport* rep, ae_state *_state)
     ae_frame _frame_block;
     rbfv1report rep1;
     rbfv2report rep2;
+    rbfv3report rep3;
     ae_matrix x3;
     ae_vector scalevec;
     ae_int_t i;
+    ae_int_t v3bftype;
+    double v3bfparam;
     ae_int_t curalgorithmtype;
 
     ae_frame_make(_state, &_frame_block);
     memset(&rep1, 0, sizeof(rep1));
     memset(&rep2, 0, sizeof(rep2));
+    memset(&rep3, 0, sizeof(rep3));
     memset(&x3, 0, sizeof(x3));
     memset(&scalevec, 0, sizeof(scalevec));
     _rbfreport_clear(rep);
     _rbfv1report_init(&rep1, _state, ae_true);
     _rbfv2report_init(&rep2, _state, ae_true);
+    _rbfv3report_init(&rep3, _state, ae_true);
     ae_matrix_init(&x3, 0, 0, DT_REAL, _state, ae_true);
     ae_vector_init(&scalevec, 0, DT_REAL, _state, ae_true);
 
@@ -55627,20 +64413,22 @@ void rbfbuildmodel(rbfmodel* s, rbfreport* rep, ae_state *_state)
     /*
      * Autoselect algorithm
      */
+    v3bftype = -999;
+    v3bfparam = 0.0;
     if( s->algorithmtype==0 )
     {
-        if( (s->nx<2||s->nx>3)||s->hasscale )
-        {
-            curalgorithmtype = 3;
-        }
-        else
-        {
-            curalgorithmtype = 1;
-        }
+        curalgorithmtype = 4;
+        v3bftype = 2;
+        v3bfparam = 0.0;
     }
     else
     {
         curalgorithmtype = s->algorithmtype;
+        if( s->algorithmtype==4 )
+        {
+            v3bftype = s->bftype;
+            v3bfparam = s->bfparam;
+        }
     }
     
     /*
@@ -55690,6 +64478,7 @@ void rbfbuildmodel(rbfmodel* s, rbfreport* rep, ae_state *_state)
             rbfv1buildmodel(&s->x, &s->y, s->n, s->aterm, curalgorithmtype, s->nlayers, s->radvalue, s->radzvalue, s->lambdav, s->epsort, s->epserr, s->maxits, &s->model1, &rep1, _state);
         }
         s->modelversion = 1;
+        rbfcreatecalcbuffer(s, &s->calcbuf, _state);
         
         /*
          * Convert report fields
@@ -55735,6 +64524,7 @@ void rbfbuildmodel(rbfmodel* s, rbfreport* rep, ae_state *_state)
          */
         rbfv2buildhierarchical(&s->x, &s->y, s->n, &scalevec, s->aterm, s->nlayers, s->radvalue, s->lambdav, &s->model2, &s->progress10000, &s->terminationrequest, &rep2, _state);
         s->modelversion = 2;
+        rbfcreatecalcbuffer(s, &s->calcbuf, _state);
         
         /*
          * Convert report fields
@@ -55742,6 +64532,50 @@ void rbfbuildmodel(rbfmodel* s, rbfreport* rep, ae_state *_state)
         rep->terminationtype = rep2.terminationtype;
         rep->rmserror = rep2.rmserror;
         rep->maxerror = rep2.maxerror;
+        
+        /*
+         * Done
+         */
+        ae_frame_leave(_state);
+        return;
+    }
+    
+    /*
+     * Algorithms which generate DDM-RBF models
+     */
+    if( curalgorithmtype==4 )
+    {
+        
+        /*
+         * Prepare scale vector - use unit values or user supplied ones
+         */
+        ae_vector_set_length(&scalevec, s->nx, _state);
+        for(i=0; i<=s->nx-1; i++)
+        {
+            if( s->hasscale )
+            {
+                scalevec.ptr.p_double[i] = s->s.ptr.p_double[i];
+            }
+            else
+            {
+                scalevec.ptr.p_double[i] = (double)(1);
+            }
+        }
+        
+        /*
+         * Build model
+         */
+        rbfv3build(&s->x, &s->y, s->n, &scalevec, v3bftype, v3bfparam, s->lambdav, s->aterm, &s->model3, &s->progress10000, &s->terminationrequest, &rep3, _state);
+        s->modelversion = 3;
+        rbfcreatecalcbuffer(s, &s->calcbuf, _state);
+        
+        /*
+         * Convert report fields
+         */
+        rep->iterationscount = rep3.iterationscount;
+        rep->terminationtype = rep3.terminationtype;
+        rep->rmserror = rep3.rmserror;
+        rep->maxerror = rep3.maxerror;
         
         /*
          * Done
@@ -55759,23 +64593,22 @@ void rbfbuildmodel(rbfmodel* s, rbfreport* rep, ae_state *_state)
 
 
 /*************************************************************************
-This function calculates values of the RBF model in the given point.
+This function calculates values of the 1-dimensional RBF model with scalar
+output (NY=1) at the given point.
 
 IMPORTANT: this function works only with modern  (hierarchical)  RBFs.  It 
            can not be used with legacy (version 1) RBFs because older  RBF
            code does not support 1-dimensional models.
 
-This function should be used when we have NY=1 (scalar function) and  NX=1
-(1-dimensional space). If you have 3-dimensional space, use rbfcalc3(). If
-you  have  2-dimensional  space,  use  rbfcalc3().  If  you  have  general
-situation (NX-dimensional space, NY-dimensional function)  you  should use
-generic rbfcalc().
-
-If you want to perform parallel model evaluation  from  multiple  threads,
-use rbftscalcbuf() with per-thread buffer object.
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
 
 This function returns 0.0 when:
-* model is not initialized
+* the model is not initialized
 * NX<>1
 * NY<>1
 
@@ -55810,25 +64643,26 @@ double rbfcalc1(rbfmodel* s, double x0, ae_state *_state)
         result = rbfv2calc1(&s->model2, x0, _state);
         return result;
     }
+    if( s->modelversion==3 )
+    {
+        result = rbfv3calc1(&s->model3, x0, _state);
+        return result;
+    }
     ae_assert(ae_false, "RBFCalc1: integrity check failed", _state);
     return result;
 }
 
 
 /*************************************************************************
-This function calculates values of the RBF model in the given point.
+This function calculates values of the 2-dimensional RBF model with scalar
+output (NY=1) at the given point.
 
-This function should be used when we have NY=1 (scalar function) and  NX=2
-(2-dimensional space). If you have 3-dimensional space, use rbfcalc3(). If
-you have general situation (NX-dimensional space, NY-dimensional function)
-you should use generic rbfcalc().
-
-If  you  want  to  calculate  function  values  many times, consider using 
-rbfgridcalc2v(), which is far more efficient than many subsequent calls to
-rbfcalc2().
-
-If you want to perform parallel model evaluation  from  multiple  threads,
-use rbftscalcbuf() with per-thread buffer object.
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
 
 This function returns 0.0 when:
 * model is not initialized
@@ -55868,25 +64702,26 @@ double rbfcalc2(rbfmodel* s, double x0, double x1, ae_state *_state)
         result = rbfv2calc2(&s->model2, x0, x1, _state);
         return result;
     }
+    if( s->modelversion==3 )
+    {
+        result = rbfv3calc2(&s->model3, x0, x1, _state);
+        return result;
+    }
     ae_assert(ae_false, "RBFCalc2: integrity check failed", _state);
     return result;
 }
 
 
 /*************************************************************************
-This function calculates value of the RBF model in the given point.
+This function calculates values of the 3-dimensional RBF model with scalar
+output (NY=1) at the given point.
 
-This function should be used when we have NY=1 (scalar function) and  NX=3
-(3-dimensional space). If you have 2-dimensional space, use rbfcalc2(). If
-you have general situation (NX-dimensional space, NY-dimensional function)
-you should use generic rbfcalc().
-
-If  you  want  to  calculate  function  values  many times, consider using 
-rbfgridcalc3v(), which is far more efficient than many subsequent calls to
-rbfcalc3().
-
-If you want to perform parallel model evaluation  from  multiple  threads,
-use rbftscalcbuf() with per-thread buffer object.
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
 
 This function returns 0.0 when:
 * model is not initialized
@@ -55932,8 +64767,205 @@ double rbfcalc3(rbfmodel* s,
         result = rbfv2calc3(&s->model2, x0, x1, x2, _state);
         return result;
     }
+    if( s->modelversion==3 )
+    {
+        result = rbfv3calc3(&s->model3, x0, x1, x2, _state);
+        return result;
+    }
     ae_assert(ae_false, "RBFCalc3: integrity check failed", _state);
     return result;
+}
+
+
+/*************************************************************************
+This function calculates value and derivatives of  the  1-dimensional  RBF
+model with scalar output (NY=1) at the given point.
+
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
+
+This function returns 0.0 in Y and/or DY in the following cases:
+* the model is not initialized (Y=0, DY=0)
+* NX<>1 or NY<>1 (Y=0, DY=0)
+* the gradient is undefined at the trial point. Some basis  functions have
+  discontinuous derivatives at the interpolation nodes:
+  * biharmonic splines f=r have no Hessian and no gradient at the nodes
+  In these cases only DY is set to zero (Y is still returned)
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X0      -   first coordinate, finite number
+
+OUTPUT PARAMETERS:
+    Y       -   value of the model or 0.0 (as defined above)
+    DY0     -   derivative with respect to X0
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfdiff1(rbfmodel* s,
+     double x0,
+     double* y,
+     double* dy0,
+     ae_state *_state)
+{
+
+    *y = 0;
+    *dy0 = 0;
+
+    ae_assert(ae_isfinite(x0, _state), "RBFDiff1: invalid value for X0 (X0 is Inf or NaN)!", _state);
+    *y = (double)(0);
+    *dy0 = (double)(0);
+    if( s->ny!=1||s->nx!=1 )
+    {
+        return;
+    }
+    rallocv(1, &s->calcbuf.x, _state);
+    s->calcbuf.x.ptr.p_double[0] = x0;
+    rbftsdiffbuf(s, &s->calcbuf, &s->calcbuf.x, &s->calcbuf.y, &s->calcbuf.dy, _state);
+    *y = s->calcbuf.y.ptr.p_double[0];
+    *dy0 = s->calcbuf.dy.ptr.p_double[0];
+}
+
+
+/*************************************************************************
+This function calculates value and derivatives of  the  2-dimensional  RBF
+model with scalar output (NY=1) at the given point.
+
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
+
+This function returns 0.0 in Y and/or DY in the following cases:
+* the model is not initialized (Y=0, DY=0)
+* NX<>2 or NY<>1 (Y=0, DY=0)
+* the gradient is undefined at the trial point. Some basis  functions have
+  discontinuous derivatives at the interpolation nodes:
+  * biharmonic splines f=r have no Hessian and no gradient at the nodes
+  In these cases only DY is set to zero (Y is still returned)
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X0      -   first coordinate, finite number
+    X1      -   second coordinate, finite number
+
+OUTPUT PARAMETERS:
+    Y       -   value of the model or 0.0 (as defined above)
+    DY0     -   derivative with respect to X0
+    DY1     -   derivative with respect to X1
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfdiff2(rbfmodel* s,
+     double x0,
+     double x1,
+     double* y,
+     double* dy0,
+     double* dy1,
+     ae_state *_state)
+{
+
+    *y = 0;
+    *dy0 = 0;
+    *dy1 = 0;
+
+    ae_assert(ae_isfinite(x0, _state), "RBFDiff2: invalid value for X0 (X0 is Inf or NaN)!", _state);
+    ae_assert(ae_isfinite(x1, _state), "RBFDiff2: invalid value for X1 (X1 is Inf or NaN)!", _state);
+    *y = (double)(0);
+    *dy0 = (double)(0);
+    *dy1 = (double)(0);
+    if( s->ny!=1||s->nx!=2 )
+    {
+        return;
+    }
+    rallocv(2, &s->calcbuf.x, _state);
+    s->calcbuf.x.ptr.p_double[0] = x0;
+    s->calcbuf.x.ptr.p_double[1] = x1;
+    rbftsdiffbuf(s, &s->calcbuf, &s->calcbuf.x, &s->calcbuf.y, &s->calcbuf.dy, _state);
+    *y = s->calcbuf.y.ptr.p_double[0];
+    *dy0 = s->calcbuf.dy.ptr.p_double[0];
+    *dy1 = s->calcbuf.dy.ptr.p_double[1];
+}
+
+
+/*************************************************************************
+This function calculates value and derivatives of  the  3-dimensional  RBF
+model with scalar output (NY=1) at the given point.
+
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
+
+This function returns 0.0 in Y and/or DY in the following cases:
+* the model is not initialized (Y=0, DY=0)
+* NX<>3 or NY<>1 (Y=0, DY=0)
+* the gradient is undefined at the trial point. Some basis  functions have
+  discontinuous derivatives at the interpolation nodes:
+  * biharmonic splines f=r have no Hessian and no gradient at the nodes
+  In these cases only DY is set to zero (Y is still returned)
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X0      -   first coordinate, finite number
+    X1      -   second coordinate, finite number
+    X2      -   third coordinate, finite number
+
+OUTPUT PARAMETERS:
+    Y       -   value of the model or 0.0 (as defined above)
+    DY0     -   derivative with respect to X0
+    DY1     -   derivative with respect to X1
+    DY2     -   derivative with respect to X2
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfdiff3(rbfmodel* s,
+     double x0,
+     double x1,
+     double x2,
+     double* y,
+     double* dy0,
+     double* dy1,
+     double* dy2,
+     ae_state *_state)
+{
+
+    *y = 0;
+    *dy0 = 0;
+    *dy1 = 0;
+    *dy2 = 0;
+
+    ae_assert(ae_isfinite(x0, _state), "RBFDiff3: invalid value for X0 (X0 is Inf or NaN)!", _state);
+    ae_assert(ae_isfinite(x1, _state), "RBFDiff3: invalid value for X1 (X1 is Inf or NaN)!", _state);
+    ae_assert(ae_isfinite(x2, _state), "RBFDiff3: invalid value for X2 (X2 is Inf or NaN)!", _state);
+    *y = (double)(0);
+    *dy0 = (double)(0);
+    *dy1 = (double)(0);
+    *dy2 = (double)(0);
+    if( s->ny!=1||s->nx!=3 )
+    {
+        return;
+    }
+    rallocv(3, &s->calcbuf.x, _state);
+    s->calcbuf.x.ptr.p_double[0] = x0;
+    s->calcbuf.x.ptr.p_double[1] = x1;
+    s->calcbuf.x.ptr.p_double[2] = x2;
+    rbftsdiffbuf(s, &s->calcbuf, &s->calcbuf.x, &s->calcbuf.y, &s->calcbuf.dy, _state);
+    *y = s->calcbuf.y.ptr.p_double[0];
+    *dy0 = s->calcbuf.dy.ptr.p_double[0];
+    *dy1 = s->calcbuf.dy.ptr.p_double[1];
+    *dy2 = s->calcbuf.dy.ptr.p_double[2];
 }
 
 
@@ -55945,8 +64977,12 @@ the space of arguments) and NY (dimension of the function itself). However
 when  you  have  NY=1  you  may  find more convenient to use rbfcalc2() or 
 rbfcalc3().
 
-If you want to perform parallel model evaluation  from  multiple  threads,
-use rbftscalcbuf() with per-thread buffer object.
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
 
 This function returns 0.0 when model is not initialized.
 
@@ -55980,13 +65016,158 @@ void rbfcalc(rbfmodel* s,
 
 
 /*************************************************************************
+This function calculates values of the RBF model and  its  derivatives  at
+the given point.
+
+This is general function which can be used for arbitrary NX (dimension  of 
+the space of arguments) and NY (dimension of the function itself). However
+if you have NX=3 and NY=1, you may find more convenient to use rbfdiff3().
+
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftsdiffbuf() with per-thread buffer object.
+
+This function returns 0.0 in Y and/or DY in the following cases:
+* the model is not initialized (Y=0, DY=0)
+* the gradient is undefined at the trial point. Some basis  functions have
+  discontinuous derivatives at the interpolation nodes:
+  * biharmonic splines f=r have no Hessian and no gradient at the nodes
+  In these cases only DY is set to zero (Y is still returned)
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only 
+                leading NX will be used.
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY]. Y is out-parameter and 
+                reallocated after call to this function. In case you  want
+                to reuse previously allocated Y, you may use RBFDiffBuf(),
+                which reallocates Y only when it is too small.
+    DY      -   derivatives, array[NX*NY]:
+                * Y[I*NX+J] with 0<=I<NY and 0<=J<NX  stores derivative of
+                  function component I with respect to input J.
+                * for NY=1 it is simply NX-dimensional gradient of the
+                  scalar NX-dimensional function
+                DY is out-parameter and reallocated  after  call  to  this
+                function. In case you want to reuse  previously  allocated
+                DY, you may use RBFDiffBuf(), which  reallocates  DY  only
+                when it is too small to store the result.
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfdiff(rbfmodel* s,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* dy,
+     ae_state *_state)
+{
+
+    ae_vector_clear(y);
+    ae_vector_clear(dy);
+
+    ae_assert(x->cnt>=s->nx, "RBFDiff: Length(X)<NX", _state);
+    ae_assert(isfinitevector(x, s->nx, _state), "RBFDiff: X contains infinite or NaN values", _state);
+    rbfdiffbuf(s, x, y, dy, _state);
+}
+
+
+/*************************************************************************
+This function calculates values of the RBF model and  its first and second
+derivatives (Hessian matrix) at the given point.
+
+This function supports both scalar (NY=1) and vector-valued (NY>1) RBFs.
+
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftshessbuf() with per-thread buffer object.
+
+This function returns 0 in Y and/or DY and/or D2Y in the following cases:
+* the model is not initialized (Y=0, DY=0, D2Y=0)
+* the gradient and/or Hessian is undefined at the trial point.  Some basis
+  functions have discontinuous derivatives at the interpolation nodes:
+  * thin plate splines have no Hessian at the nodes
+  * biharmonic splines f=r have no Hessian and no gradient at the  nodes
+  In these cases only corresponding derivative is set  to  zero,  and  the
+  rest of the derivatives is still returned.
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only 
+                leading NX will be used.
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY].
+                Y is out-parameter and  reallocated  after  call  to  this
+                function. In case you  want to reuse previously  allocated
+                Y, you may use RBFHessBuf(), which reallocates Y only when
+                it is too small.
+    DY      -   first derivatives, array[NY*NX]:
+                * Y[I*NX+J] with 0<=I<NY and 0<=J<NX  stores derivative of
+                  function component I with respect to input J.
+                * for NY=1 it is simply NX-dimensional gradient of the
+                  scalar NX-dimensional function
+                DY is out-parameter and reallocated  after  call  to  this
+                function. In case you want to reuse  previously  allocated
+                DY, you may use RBFHessBuf(), which  reallocates  DY  only
+                when it is too small to store the result.
+    D2Y     -   second derivatives, array[NY*NX*NX]:
+                * for NY=1 it is NX*NX array that stores  Hessian  matrix,
+                  with Y[I*NX+J]=Y[J*NX+I].
+                * for  a  vector-valued  RBF  with  NY>1  it  contains  NY
+                  subsequently stored Hessians: an element Y[K*NX*NX+I*NX+J]
+                  with  0<=K<NY,  0<=I<NX  and  0<=J<NX    stores   second
+                  derivative of the function #K  with  respect  to  inputs
+                  #I and #J.
+                D2Y is out-parameter and reallocated  after  call  to this
+                function. In case you want to reuse  previously  allocated
+                D2Y, you may use RBFHessBuf(), which  reallocates D2Y only
+                when it is too small to store the result.
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfhess(rbfmodel* s,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* dy,
+     /* Real    */ ae_vector* d2y,
+     ae_state *_state)
+{
+
+    ae_vector_clear(y);
+    ae_vector_clear(dy);
+    ae_vector_clear(d2y);
+
+    ae_assert(x->cnt>=s->nx, "RBFHess: Length(X)<NX", _state);
+    ae_assert(isfinitevector(x, s->nx, _state), "RBFHess: X contains infinite or NaN values", _state);
+    rbftshessbuf(s, &s->calcbuf, x, y, dy, d2y, _state);
+}
+
+
+/*************************************************************************
 This function calculates values of the RBF model at the given point.
 
 Same as rbfcalc(), but does not reallocate Y when in is large enough to 
 store function values.
 
-If you want to perform parallel model evaluation  from  multiple  threads,
-use rbftscalcbuf() with per-thread buffer object.
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftscalcbuf() with per-thread buffer object.
 
 INPUT PARAMETERS:
     S       -   RBF model
@@ -56030,7 +65211,173 @@ void rbfcalcbuf(rbfmodel* s,
         rbfv2calcbuf(&s->model2, x, y, _state);
         return;
     }
+    if( s->modelversion==3 )
+    {
+        rbfv3calcbuf(&s->model3, x, y, _state);
+        return;
+    }
     ae_assert(ae_false, "RBFCalcBuf: integrity check failed", _state);
+}
+
+
+/*************************************************************************
+This function calculates values of the RBF model and  its  derivatives  at
+the given point. It is a buffered version of the RBFDiff() which tries  to
+reuse possibly preallocated output arrays Y/DY as much as possible.
+
+This is general function which can be used for arbitrary NX (dimension  of 
+the space of arguments) and NY (dimension of the function itself). However
+if you have NX=1, 2 or 3 and NY=1, you may find  more  convenient  to  use
+rbfdiff1(), rbfdiff2() or rbfdiff3().
+
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftsdiffbuf() with per-thread buffer object.
+
+This function returns 0.0 in Y and/or DY in the following cases:
+* the model is not initialized (Y=0, DY=0)
+* the gradient is undefined at the trial point. Some basis  functions have
+  discontinuous derivatives at the interpolation nodes:
+  * biharmonic splines f=r have no Hessian and no gradient at the nodes
+  In these cases only DY is set to zero (Y is still returned)
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only 
+                leading NX will be used.
+    Y, DY   -   possibly preallocated arrays; if array size is large enough
+                to store results, this function does not  reallocate  array
+                to fit output size exactly.
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY].
+    DY      -   derivatives, array[NX*NY]:
+                * Y[I*NX+J] with 0<=I<NY and 0<=J<NX  stores derivative of
+                  function component I with respect to input J.
+                * for NY=1 it is simply NX-dimensional gradient of the
+                  scalar NX-dimensional function
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfdiffbuf(rbfmodel* s,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* dy,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+
+    ae_assert(x->cnt>=s->nx, "RBFDiffBuf: Length(X)<NX", _state);
+    ae_assert(isfinitevector(x, s->nx, _state), "RBFDiffBuf: X contains infinite or NaN values", _state);
+    ae_assert(s->modelversion==s->calcbuf.modelversion, "RBF: integrity check 3945 failed", _state);
+    if( y->cnt<s->ny )
+    {
+        ae_vector_set_length(y, s->ny, _state);
+    }
+    if( dy->cnt<s->ny*s->nx )
+    {
+        ae_vector_set_length(dy, s->ny*s->nx, _state);
+    }
+    for(i=0; i<=s->ny-1; i++)
+    {
+        y->ptr.p_double[i] = (double)(0);
+    }
+    for(i=0; i<=s->ny*s->nx-1; i++)
+    {
+        dy->ptr.p_double[i] = (double)(0);
+    }
+    if( s->modelversion==1 )
+    {
+        rbfv1tsdiffbuf(&s->model1, &s->calcbuf.bufv1, x, y, dy, _state);
+        return;
+    }
+    if( s->modelversion==2 )
+    {
+        rbfv2tsdiffbuf(&s->model2, &s->calcbuf.bufv2, x, y, dy, _state);
+        return;
+    }
+    if( s->modelversion==3 )
+    {
+        rbfv3tsdiffbuf(&s->model3, &s->calcbuf.bufv3, x, y, dy, _state);
+        return;
+    }
+    ae_assert(ae_false, "RBFDiffBuf: integrity check failed", _state);
+}
+
+
+/*************************************************************************
+This function calculates values of the RBF model and  its first and second
+derivatives (Hessian matrix) at the given point. It is a buffered  version
+that reuses memory  allocated  in  output  buffers  Y/DY/D2Y  as  much  as
+possible.
+
+This function supports both scalar (NY=1) and vector-valued (NY>1) RBFs.
+
+IMPORTANT: THIS FUNCTION IS THREAD-UNSAFE. It uses fields of  rbfmodel  as
+           temporary arrays, i.e. it is  impossible  to  perform  parallel
+           evaluation on the same rbfmodel object (parallel calls of  this
+           function for independent rbfmodel objects are safe).
+           
+           If you want to perform parallel model evaluation  from multiple
+           threads, use rbftshessbuf() with per-thread buffer object.
+
+This function returns 0 in Y and/or DY and/or D2Y in the following cases:
+* the model is not initialized (Y=0, DY=0, D2Y=0)
+* the gradient and/or Hessian is undefined at the trial point.  Some basis
+  functions have discontinuous derivatives at the interpolation nodes:
+  * thin plate splines have no Hessian at the nodes
+  * biharmonic splines f=r have no Hessian and no gradient at the  nodes
+  In these cases only corresponding derivative is set  to  zero,  and  the
+  rest of the derivatives is still returned.
+
+INPUT PARAMETERS:
+    S       -   RBF model
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only 
+                leading NX will be used.
+    Y,DY,D2Y-   possible preallocated output arrays. If these  arrays  are
+                smaller than  required  to  store  the  result,  they  are
+                automatically reallocated. If array is large enough, it is
+                not resized.
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY].
+    DY      -   first derivatives, array[NY*NX]:
+                * Y[I*NX+J] with 0<=I<NY and 0<=J<NX  stores derivative of
+                  function component I with respect to input J.
+                * for NY=1 it is simply NX-dimensional gradient of the
+                  scalar NX-dimensional function
+    D2Y     -   second derivatives, array[NY*NX*NX]:
+                * for NY=1 it is NX*NX array that stores  Hessian  matrix,
+                  with Y[I*NX+J]=Y[J*NX+I].
+                * for  a  vector-valued  RBF  with  NY>1  it  contains  NY
+                  subsequently stored Hessians: an element Y[K*NX*NX+I*NX+J]
+                  with  0<=K<NY,  0<=I<NX  and  0<=J<NX    stores   second
+                  derivative of the function #K  with  respect  to  inputs
+                  #I and #J.
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbfhessbuf(rbfmodel* s,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* dy,
+     /* Real    */ ae_vector* d2y,
+     ae_state *_state)
+{
+
+
+    ae_assert(x->cnt>=s->nx, "RBFHess: Length(X)<NX", _state);
+    ae_assert(isfinitevector(x, s->nx, _state), "RBFHess: X contains infinite or NaN values", _state);
+    rbftshessbuf(s, &s->calcbuf, x, y, dy, d2y, _state);
 }
 
 
@@ -56089,7 +65436,207 @@ void rbftscalcbuf(rbfmodel* s,
         rbfv2tscalcbuf(&s->model2, &buf->bufv2, x, y, _state);
         return;
     }
+    if( s->modelversion==3 )
+    {
+        rbfv3tscalcbuf(&s->model3, &buf->bufv3, x, y, _state);
+        return;
+    }
     ae_assert(ae_false, "RBFTsCalcBuf: integrity check failed", _state);
+}
+
+
+/*************************************************************************
+This function calculates values of the RBF model and  its  derivatives  at
+the given point, using external buffer object (internal temporaries of the
+RBF model are not modified).
+
+This function allows to use same RBF model object  in  different  threads,
+assuming  that  different   threads  use different instances of the buffer
+structure.
+
+This function returns 0.0 in Y and/or DY in the following cases:
+* the model is not initialized (Y=0, DY=0)
+* the gradient is undefined at the trial point. Some basis  functions have
+  discontinuous derivatives at the interpolation nodes:
+  * biharmonic splines f=r have no Hessian and no gradient at the nodes
+  In these cases only DY is set to zero (Y is still returned)
+
+INPUT PARAMETERS:
+    S       -   RBF model, may be shared between different threads
+    Buf     -   buffer object created for this particular instance of  RBF
+                model with rbfcreatecalcbuffer().
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only 
+                leading NX will be used.
+    Y, DY   -   possibly preallocated arrays; if array size is large enough
+                to store results, this function does not  reallocate  array
+                to fit output size exactly.
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY].
+    DY      -   derivatives, array[NX*NY]:
+                * Y[I*NX+J] with 0<=I<NY and 0<=J<NX  stores derivative of
+                  function component I with respect to input J.
+                * for NY=1 it is simply NX-dimensional gradient of the
+                  scalar NX-dimensional function
+                Zero is returned when the first derivative is undefined.
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbftsdiffbuf(rbfmodel* s,
+     rbfcalcbuffer* buf,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* dy,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+
+    ae_assert(x->cnt>=s->nx, "RBFTsDiffBuf: Length(X)<NX", _state);
+    ae_assert(isfinitevector(x, s->nx, _state), "RBFTsDiffBuf: X contains infinite or NaN values", _state);
+    ae_assert(s->modelversion==buf->modelversion, "RBFTsDiffBuf: integrity check 3985 failed", _state);
+    if( y->cnt<s->ny )
+    {
+        ae_vector_set_length(y, s->ny, _state);
+    }
+    if( dy->cnt<s->ny*s->nx )
+    {
+        ae_vector_set_length(dy, s->ny*s->nx, _state);
+    }
+    for(i=0; i<=s->ny-1; i++)
+    {
+        y->ptr.p_double[i] = (double)(0);
+    }
+    for(i=0; i<=s->ny*s->nx-1; i++)
+    {
+        dy->ptr.p_double[i] = (double)(0);
+    }
+    if( s->modelversion==1 )
+    {
+        rbfv1tsdiffbuf(&s->model1, &buf->bufv1, x, y, dy, _state);
+        return;
+    }
+    if( s->modelversion==2 )
+    {
+        rbfv2tsdiffbuf(&s->model2, &buf->bufv2, x, y, dy, _state);
+        return;
+    }
+    if( s->modelversion==3 )
+    {
+        rbfv3tsdiffbuf(&s->model3, &buf->bufv3, x, y, dy, _state);
+        return;
+    }
+    ae_assert(ae_false, "RBFDiffBuf: integrity check failed", _state);
+}
+
+
+/*************************************************************************
+This function calculates values of the RBF model and  its first and second
+derivatives (Hessian matrix) at the given  point,  using  external  buffer
+object (internal temporaries of the RBF  model  are  not  modified).
+
+This function allows to use same RBF model object  in  different  threads,
+assuming  that  different   threads  use different instances of the buffer
+structure.
+
+This function returns 0 in Y and/or DY and/or D2Y in the following cases:
+* the model is not initialized (Y=0, DY=0, D2Y=0)
+* the gradient and/or Hessian is undefined at the trial point.  Some basis
+  functions have discontinuous derivatives at the interpolation nodes:
+  * thin plate splines have no Hessian at the nodes
+  * biharmonic splines f=r have no Hessian and no gradient at the  nodes
+  In these cases only corresponding derivative is set  to  zero,  and  the
+  rest of the derivatives is still returned.
+
+INPUT PARAMETERS:
+    S       -   RBF model, may be shared between different threads
+    Buf     -   buffer object created for this particular instance of  RBF
+                model with rbfcreatecalcbuffer().
+    X       -   coordinates, array[NX].
+                X may have more than NX elements, in this case only 
+                leading NX will be used.
+    Y,DY,D2Y-   possible preallocated output arrays. If these  arrays  are
+                smaller than  required  to  store  the  result,  they  are
+                automatically reallocated. If array is large enough, it is
+                not resized.
+
+OUTPUT PARAMETERS:
+    Y       -   function value, array[NY].
+    DY      -   first derivatives, array[NY*NX]:
+                * Y[I*NX+J] with 0<=I<NY and 0<=J<NX  stores derivative of
+                  function component I with respect to input J.
+                * for NY=1 it is simply NX-dimensional gradient of the
+                  scalar NX-dimensional function
+                Zero is returned when the first derivative is undefined.
+    D2Y     -   second derivatives, array[NY*NX*NX]:
+                * for NY=1 it is NX*NX array that stores  Hessian  matrix,
+                  with Y[I*NX+J]=Y[J*NX+I].
+                * for  a  vector-valued  RBF  with  NY>1  it  contains  NY
+                  subsequently stored Hessians: an element Y[K*NX*NX+I*NX+J]
+                  with  0<=K<NY,  0<=I<NX  and  0<=J<NX    stores   second
+                  derivative of the function #K  with  respect  to  inputs
+                  #I and #J.
+                Zero is returned when the second derivative is undefined.
+
+  -- ALGLIB --
+     Copyright 13.12.2021 by Bochkanov Sergey
+*************************************************************************/
+void rbftshessbuf(rbfmodel* s,
+     rbfcalcbuffer* buf,
+     /* Real    */ ae_vector* x,
+     /* Real    */ ae_vector* y,
+     /* Real    */ ae_vector* dy,
+     /* Real    */ ae_vector* d2y,
+     ae_state *_state)
+{
+    ae_int_t i;
+
+
+    ae_assert(x->cnt>=s->nx, "RBFTsHessBuf: Length(X)<NX", _state);
+    ae_assert(isfinitevector(x, s->nx, _state), "RBFTsHessBuf: X contains infinite or NaN values", _state);
+    ae_assert(s->modelversion==buf->modelversion, "RBFTsHessBuf: integrity check 3953 failed", _state);
+    if( y->cnt<s->ny )
+    {
+        ae_vector_set_length(y, s->ny, _state);
+    }
+    if( dy->cnt<s->ny*s->nx )
+    {
+        ae_vector_set_length(dy, s->ny*s->nx, _state);
+    }
+    if( d2y->cnt<s->ny*s->nx*s->nx )
+    {
+        ae_vector_set_length(d2y, s->ny*s->nx*s->nx, _state);
+    }
+    for(i=0; i<=s->ny-1; i++)
+    {
+        y->ptr.p_double[i] = (double)(0);
+    }
+    for(i=0; i<=s->ny*s->nx-1; i++)
+    {
+        dy->ptr.p_double[i] = (double)(0);
+    }
+    for(i=0; i<=s->ny*s->nx*s->nx-1; i++)
+    {
+        d2y->ptr.p_double[i] = (double)(0);
+    }
+    if( s->modelversion==1 )
+    {
+        rbfv1tshessbuf(&s->model1, &buf->bufv1, x, y, dy, d2y, _state);
+        return;
+    }
+    if( s->modelversion==2 )
+    {
+        rbfv2tshessbuf(&s->model2, &buf->bufv2, x, y, dy, d2y, _state);
+        return;
+    }
+    if( s->modelversion==3 )
+    {
+        rbfv3tshessbuf(&s->model3, &buf->bufv3, x, y, dy, d2y, _state);
+        return;
+    }
+    ae_assert(ae_false, "RBFDiffBuf: integrity check failed", _state);
 }
 
 
@@ -56110,24 +65657,14 @@ void rbfgridcalc2(rbfmodel* s,
      ae_state *_state)
 {
     ae_frame _frame_block;
-    ae_vector cpx0;
-    ae_vector cpx1;
-    ae_vector p01;
-    ae_vector p11;
-    ae_vector p2;
+    ae_int_t i;
+    ae_int_t j;
+    ae_vector yy;
 
     ae_frame_make(_state, &_frame_block);
-    memset(&cpx0, 0, sizeof(cpx0));
-    memset(&cpx1, 0, sizeof(cpx1));
-    memset(&p01, 0, sizeof(p01));
-    memset(&p11, 0, sizeof(p11));
-    memset(&p2, 0, sizeof(p2));
+    memset(&yy, 0, sizeof(yy));
     ae_matrix_clear(y);
-    ae_vector_init(&cpx0, 0, DT_REAL, _state, ae_true);
-    ae_vector_init(&cpx1, 0, DT_REAL, _state, ae_true);
-    ae_vector_init(&p01, 0, DT_INT, _state, ae_true);
-    ae_vector_init(&p11, 0, DT_INT, _state, ae_true);
-    ae_vector_init(&p2, 0, DT_INT, _state, ae_true);
+    ae_vector_init(&yy, 0, DT_REAL, _state, ae_true);
 
     ae_assert(n0>0, "RBFGridCalc2: invalid value for N0 (N0<=0)!", _state);
     ae_assert(n1>0, "RBFGridCalc2: invalid value for N1 (N1<=0)!", _state);
@@ -56144,6 +65681,26 @@ void rbfgridcalc2(rbfmodel* s,
     if( s->modelversion==2 )
     {
         rbfv2gridcalc2(&s->model2, x0, n0, x1, n1, y, _state);
+        ae_frame_leave(_state);
+        return;
+    }
+    if( s->modelversion==3 )
+    {
+        rallocm(n0, n1, y, _state);
+        if( s->nx!=2||s->ny!=1 )
+        {
+            rsetm(n0, n1, 0.0, y, _state);
+            ae_frame_leave(_state);
+            return;
+        }
+        rbfgridcalc2v(s, x0, n0, x1, n1, &yy, _state);
+        for(i=0; i<=n0-1; i++)
+        {
+            for(j=0; j<=n1-1; j++)
+            {
+                y->ptr.pp_double[i][j] = yy.ptr.p_double[i+j*n0];
+            }
+        }
         ae_frame_leave(_state);
         return;
     }
@@ -56683,6 +66240,20 @@ void rbfgridcalc2vx(rbfmodel* s,
     }
     
     /*
+     * Reference code for V3 models
+     */
+    if( s->modelversion==3 )
+    {
+        ae_vector_set_length(&dummyx2, 1, _state);
+        dummyx2.ptr.p_double[0] = (double)(0);
+        ae_vector_set_length(&dummyx3, 1, _state);
+        dummyx3.ptr.p_double[0] = (double)(0);
+        rbfv3gridcalcvx(&s->model3, x0, n0, x1, n1, &dummyx2, 1, &dummyx3, 1, flagy, sparsey, y, _state);
+        ae_frame_leave(_state);
+        return;
+    }
+    
+    /*
      * Process V2 model
      */
     if( s->modelversion==2 )
@@ -56733,7 +66304,7 @@ void rbfgridcalc2vx(rbfmodel* s,
     /*
      * Unknown model
      */
-    ae_assert(ae_false, "RBFGradCalc3VX: integrity check failed", _state);
+    ae_assert(ae_false, "RBFGridCalc2VX: integrity check failed", _state);
     ae_frame_leave(_state);
 }
 
@@ -56950,9 +66521,21 @@ void rbfgridcalc3vx(rbfmodel* s,
     }
     
     /*
+     * Process V3 model
+     */
+    if( s->modelversion==3 )
+    {
+        ae_vector_set_length(&dummyx3, 1, _state);
+        dummyx3.ptr.p_double[0] = (double)(0);
+        rbfv3gridcalcvx(&s->model3, x0, n0, x1, n1, x2, n2, &dummyx3, 1, flagy, sparsey, y, _state);
+        ae_frame_leave(_state);
+        return;
+    }
+    
+    /*
      * Unknown model
      */
-    ae_assert(ae_false, "RBFGradCalc3VX: integrity check failed", _state);
+    ae_assert(ae_false, "RBFGridCalc3VX: integrity check failed", _state);
     ae_frame_leave(_state);
 }
 
@@ -56966,16 +66549,42 @@ INPUT PARAMETERS:
 OUTPUT PARAMETERS:
     NX      -   dimensionality of argument
     NY      -   dimensionality of the target function
-    XWR     -   model information, array[NC,NX+NY+1].
-                One row of the array corresponds to one basis function:
+    XWR     -   model  information ,  2D  array.  One  row  of  the  array
+                corresponds to one basis function.
+                
+                For ModelVersion=1 we have NX+NY+1 columns:
                 * first NX columns  - coordinates of the center 
-                * next NY columns   - weights, one per dimension of the 
-                                      function being modelled
-                For ModelVersion=1:
+                * next  NY columns  - weights, one per dimension of the 
+                                      function being modeled
                 * last column       - radius, same for all dimensions of
-                                      the function being modelled
-                For ModelVersion=2:
+                                      the function being modeled
+                
+                For ModelVersion=2 we have NX+NY+NX columns:
+                * first NX columns  - coordinates of the center 
+                * next  NY columns  - weights, one per dimension of the 
+                                      function being modeled
                 * last NX columns   - radii, one per dimension
+                
+                For ModelVersion=3 we have NX+NY+NX+3 columns:
+                * first NX columns  - coordinates of the center 
+                * next  NY columns  - weights, one per dimension of the 
+                                      function being modeled
+                * next NX columns   - radii, one per dimension
+                * next column       - basis function type:
+                                      * 1  for f=r
+                                      * 2  for f=r^2*ln(r)
+                                      * 10 for multiquadric f=sqrt(r^2+alpha^2)
+                * next column       - basis function parameter:
+                                      * alpha, for basis function type 10
+                                      * ignored (zero) for other basis function types
+                * next column       - point index in the original dataset,
+                                      or -1 for an artificial node created
+                                      by the solver. The algorithm may reorder
+                                      the nodes, drop some nodes or add
+                                      artificial nodes. Thus, one parsing
+                                      this column should expect all these
+                                      kinds of alterations in the dataset.
+                
     NC      -   number of the centers
     V       -   polynomial  term , array[NY,NX+1]. One row per one 
                 dimension of the function being modelled. First NX 
@@ -56986,6 +66595,8 @@ OUTPUT PARAMETERS:
                   compatible with ALGLIB 3.10 or earlier.
                 * 2 - for models created by HierarchicalRBF, requires
                   ALGLIB 3.11 or later
+                * 3 - for models created by DDM-RBF, requires
+                  ALGLIB 3.19 or later
 
   -- ALGLIB --
      Copyright 13.12.2011 by Bochkanov Sergey
@@ -57017,6 +66628,12 @@ void rbfunpack(rbfmodel* s,
     {
         *modelversion = 2;
         rbfv2unpack(&s->model2, nx, ny, xwr, nc, v, _state);
+        return;
+    }
+    if( s->modelversion==3 )
+    {
+        *modelversion = 3;
+        rbfv3unpack(&s->model3, nx, ny, xwr, nc, v, _state);
         return;
     }
     ae_assert(ae_false, "RBFUnpack: integrity check failure", _state);
@@ -57150,6 +66767,20 @@ void rbfalloc(ae_serializer* s, rbfmodel* model, ae_state *_state)
         rbfv2alloc(s, &model->model2, _state);
         return;
     }
+    
+    /*
+     * V3 model
+     */
+    if( model->modelversion==3 )
+    {
+        
+        /*
+         * Header
+         */
+        ae_serializer_alloc_entry(s);
+        rbfv3alloc(s, &model->model3, _state);
+        return;
+    }
     ae_assert(ae_false, "Assertion failed", _state);
 }
 
@@ -57193,6 +66824,20 @@ void rbfserialize(ae_serializer* s, rbfmodel* model, ae_state *_state)
         rbfv2serialize(s, &model->model2, _state);
         return;
     }
+    
+    /*
+     * V3 model
+     */
+    if( model->modelversion==3 )
+    {
+        
+        /*
+         * Header
+         */
+        ae_serializer_serialize_int(s, rbf_rbfversion3, _state);
+        rbfv3serialize(s, &model->model3, _state);
+        return;
+    }
     ae_assert(ae_false, "Assertion failed", _state);
 }
 
@@ -57218,7 +66863,7 @@ void rbfunserialize(ae_serializer* s, rbfmodel* model, ae_state *_state)
     ae_serializer_unserialize_int(s, &i0, _state);
     ae_assert(i0==getrbfserializationcode(_state), "RBFUnserialize: stream header corrupted", _state);
     ae_serializer_unserialize_int(s, &i1, _state);
-    ae_assert(i1==rbf_rbffirstversion||i1==rbf_rbfversion2, "RBFUnserialize: stream header corrupted", _state);
+    ae_assert((i1==rbf_rbffirstversion||i1==rbf_rbfversion2)||i1==rbf_rbfversion3, "RBFUnserialize: stream header corrupted", _state);
     
     /*
      * V1 model
@@ -57230,6 +66875,8 @@ void rbfunserialize(ae_serializer* s, rbfmodel* model, ae_state *_state)
         model->ny = model->model1.ny;
         model->nx = model->model1.nx;
         rbf_initializev2(model->nx, model->ny, &model->model2, _state);
+        rbf_initializev3(model->nx, model->ny, &model->model3, _state);
+        rbfcreatecalcbuffer(model, &model->calcbuf, _state);
         return;
     }
     
@@ -57243,9 +66890,26 @@ void rbfunserialize(ae_serializer* s, rbfmodel* model, ae_state *_state)
         model->ny = model->model2.ny;
         model->nx = model->model2.nx;
         rbf_initializev1(model->nx, model->ny, &model->model1, _state);
+        rbf_initializev3(model->nx, model->ny, &model->model3, _state);
+        rbfcreatecalcbuffer(model, &model->calcbuf, _state);
         return;
     }
-    ae_assert(ae_false, "Assertion failed", _state);
+    
+    /*
+     * V3 model
+     */
+    if( i1==rbf_rbfversion3 )
+    {
+        rbfv3unserialize(s, &model->model3, _state);
+        model->modelversion = 3;
+        model->ny = model->model3.ny;
+        model->nx = model->model3.nx;
+        rbf_initializev1(model->nx, model->ny, &model->model1, _state);
+        rbf_initializev2(model->nx, model->ny, &model->model2, _state);
+        rbfcreatecalcbuffer(model, &model->calcbuf, _state);
+        return;
+    }
+    ae_assert(ae_false, "RBF: unserialiation error (unexpected model type)", _state);
 }
 
 
@@ -57315,6 +66979,24 @@ static void rbf_initializev2(ae_int_t nx,
 
 
 /*************************************************************************
+Initialize V3 model
+
+  -- ALGLIB --
+     Copyright 12.05.2016 by Bochkanov Sergey
+*************************************************************************/
+static void rbf_initializev3(ae_int_t nx,
+     ae_int_t ny,
+     rbfv3model* s,
+     ae_state *_state)
+{
+
+    _rbfv3model_clear(s);
+
+    rbfv3create(nx, ny, 2, (double)(0), s, _state);
+}
+
+
+/*************************************************************************
 Cleans report fields
 
   -- ALGLIB --
@@ -57341,6 +67023,10 @@ void _rbfcalcbuffer_init(void* _p, ae_state *_state, ae_bool make_automatic)
     ae_touch_ptr((void*)p);
     _rbfv1calcbuffer_init(&p->bufv1, _state, make_automatic);
     _rbfv2calcbuffer_init(&p->bufv2, _state, make_automatic);
+    _rbfv3calcbuffer_init(&p->bufv3, _state, make_automatic);
+    ae_vector_init(&p->x, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->y, 0, DT_REAL, _state, make_automatic);
+    ae_vector_init(&p->dy, 0, DT_REAL, _state, make_automatic);
 }
 
 
@@ -57351,6 +67037,10 @@ void _rbfcalcbuffer_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool 
     dst->modelversion = src->modelversion;
     _rbfv1calcbuffer_init_copy(&dst->bufv1, &src->bufv1, _state, make_automatic);
     _rbfv2calcbuffer_init_copy(&dst->bufv2, &src->bufv2, _state, make_automatic);
+    _rbfv3calcbuffer_init_copy(&dst->bufv3, &src->bufv3, _state, make_automatic);
+    ae_vector_init_copy(&dst->x, &src->x, _state, make_automatic);
+    ae_vector_init_copy(&dst->y, &src->y, _state, make_automatic);
+    ae_vector_init_copy(&dst->dy, &src->dy, _state, make_automatic);
 }
 
 
@@ -57360,6 +67050,10 @@ void _rbfcalcbuffer_clear(void* _p)
     ae_touch_ptr((void*)p);
     _rbfv1calcbuffer_clear(&p->bufv1);
     _rbfv2calcbuffer_clear(&p->bufv2);
+    _rbfv3calcbuffer_clear(&p->bufv3);
+    ae_vector_clear(&p->x);
+    ae_vector_clear(&p->y);
+    ae_vector_clear(&p->dy);
 }
 
 
@@ -57369,6 +67063,10 @@ void _rbfcalcbuffer_destroy(void* _p)
     ae_touch_ptr((void*)p);
     _rbfv1calcbuffer_destroy(&p->bufv1);
     _rbfv2calcbuffer_destroy(&p->bufv2);
+    _rbfv3calcbuffer_destroy(&p->bufv3);
+    ae_vector_destroy(&p->x);
+    ae_vector_destroy(&p->y);
+    ae_vector_destroy(&p->dy);
 }
 
 
@@ -57378,6 +67076,8 @@ void _rbfmodel_init(void* _p, ae_state *_state, ae_bool make_automatic)
     ae_touch_ptr((void*)p);
     _rbfv1model_init(&p->model1, _state, make_automatic);
     _rbfv2model_init(&p->model2, _state, make_automatic);
+    _rbfv3model_init(&p->model3, _state, make_automatic);
+    _rbfcalcbuffer_init(&p->calcbuf, _state, make_automatic);
     ae_matrix_init(&p->x, 0, 0, DT_REAL, _state, make_automatic);
     ae_matrix_init(&p->y, 0, 0, DT_REAL, _state, make_automatic);
     ae_vector_init(&p->s, 0, DT_REAL, _state, make_automatic);
@@ -57393,12 +67093,16 @@ void _rbfmodel_init_copy(void* _dst, void* _src, ae_state *_state, ae_bool make_
     dst->modelversion = src->modelversion;
     _rbfv1model_init_copy(&dst->model1, &src->model1, _state, make_automatic);
     _rbfv2model_init_copy(&dst->model2, &src->model2, _state, make_automatic);
+    _rbfv3model_init_copy(&dst->model3, &src->model3, _state, make_automatic);
+    _rbfcalcbuffer_init_copy(&dst->calcbuf, &src->calcbuf, _state, make_automatic);
     dst->lambdav = src->lambdav;
     dst->radvalue = src->radvalue;
     dst->radzvalue = src->radzvalue;
     dst->nlayers = src->nlayers;
     dst->aterm = src->aterm;
     dst->algorithmtype = src->algorithmtype;
+    dst->bftype = src->bftype;
+    dst->bfparam = src->bfparam;
     dst->epsort = src->epsort;
     dst->epserr = src->epserr;
     dst->maxits = src->maxits;
@@ -57419,6 +67123,8 @@ void _rbfmodel_clear(void* _p)
     ae_touch_ptr((void*)p);
     _rbfv1model_clear(&p->model1);
     _rbfv2model_clear(&p->model2);
+    _rbfv3model_clear(&p->model3);
+    _rbfcalcbuffer_clear(&p->calcbuf);
     ae_matrix_clear(&p->x);
     ae_matrix_clear(&p->y);
     ae_vector_clear(&p->s);
@@ -57431,6 +67137,8 @@ void _rbfmodel_destroy(void* _p)
     ae_touch_ptr((void*)p);
     _rbfv1model_destroy(&p->model1);
     _rbfv2model_destroy(&p->model2);
+    _rbfv3model_destroy(&p->model3);
+    _rbfcalcbuffer_destroy(&p->calcbuf);
     ae_matrix_destroy(&p->x);
     ae_matrix_destroy(&p->y);
     ae_vector_destroy(&p->s);

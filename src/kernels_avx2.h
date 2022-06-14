@@ -1,5 +1,5 @@
 /*************************************************************************
-ALGLIB 3.18.0 (source code generated 2021-10-25)
+ALGLIB 3.19.0 (source code generated 2022-06-07)
 Copyright (c) Sergey Bochkanov (ALGLIB project).
 
 >>> SOURCE LICENSE >>>
@@ -62,6 +62,7 @@ void bsetv_avx2(const ae_int_t n, const ae_bool v, ae_bool* __restrict x,
     ae_state* __restrict _state);
 void rmulv_avx2(const ae_int_t n, const double v, double* __restrict x,
      const ae_state* __restrict _state);
+void rsqrtv_avx2(const ae_int_t n, double* __restrict x, const ae_state* __restrict _state);
 void rmulvx_avx2(const ae_int_t n, const double v, double* __restrict x,
     const ae_state* __restrict _state);
 void raddv_avx2(const ae_int_t n,
@@ -72,6 +73,10 @@ void raddv_avx2(const ae_int_t n,
 void raddvx_avx2(const ae_int_t n, const double alpha, const double* __restrict y,
     double* __restrict x, ae_state *_state);
 void rmergemulv_avx2(ae_int_t n,
+     /* Real    */ const double* __restrict y,
+     /* Real    */ double* __restrict x,
+     const ae_state* __restrict _state);
+void rmergedivv_avx2(ae_int_t n,
      /* Real    */ const double* __restrict y,
      /* Real    */ double* __restrict x,
      const ae_state* __restrict _state);

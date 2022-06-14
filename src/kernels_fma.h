@@ -1,5 +1,5 @@
 /*************************************************************************
-ALGLIB 3.18.0 (source code generated 2021-10-25)
+ALGLIB 3.19.0 (source code generated 2022-06-07)
 Copyright (c) Sergey Bochkanov (ALGLIB project).
 
 >>> SOURCE LICENSE >>>
@@ -43,6 +43,28 @@ void raddv_fma(const ae_int_t n,
      /* Real    */ double* __restrict x,
      const ae_state* __restrict _state);
 void raddvx_fma(const ae_int_t n, const double alpha, const double* __restrict y, double* __restrict x, ae_state *_state);
+void rmuladdv_fma(const ae_int_t n,
+     const double* __restrict y,
+     const double* __restrict z,
+     double* __restrict x,
+     const ae_state* _state);
+void rnegmuladdv_fma(const ae_int_t n,
+     const double* __restrict y,
+     const double* __restrict z,
+     double* __restrict x,
+     const ae_state* _state);
+void rcopymuladdv_fma(const ae_int_t n,
+     const double* __restrict y,
+     const double* __restrict z,
+     const double* __restrict x,
+     double* __restrict r,
+     const ae_state* _state);
+void rcopynegmuladdv_fma(const ae_int_t n,
+     const double* __restrict y,
+     const double* __restrict z,
+     const double* __restrict x,
+     double* __restrict r,
+     const ae_state* _state);
 void rgemv_straight_fma(const ae_int_t m, const ae_int_t n,
     const double alpha, ae_matrix* __restrict a,
     const double* __restrict x, double* __restrict y, ae_state* _state);
