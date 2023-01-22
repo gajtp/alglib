@@ -1,5 +1,5 @@
 /*************************************************************************
-ALGLIB 3.19.0 (source code generated 2022-06-07)
+ALGLIB 3.20.0 (source code generated 2022-12-19)
 Copyright (c) Sergey Bochkanov (ALGLIB project).
 
 >>> SOURCE LICENSE >>>
@@ -65,6 +65,10 @@ http://www.fsf.org/licensing/licenses
 #if !defined(AE_THREADING)
 #define AE_THREADING AE_PARALLEL
 #endif
+
+/* which entropy source to use */
+#define ALGLIB_ENTROPY_SRC_STDRAND    0
+#define ALGLIB_ENTROPY_SRC_OPENSSL    1
 
 /* malloc types for AE_MALLOC */
 #define AE_STDLIB_MALLOC            200
@@ -322,6 +326,7 @@ enum { OWN_CALLER=1, OWN_AE=2 };
 enum { ACT_UNCHANGED=1, ACT_SAME_LOCATION=2, ACT_NEW_LOCATION=3 };
 enum { DT_BOOL=1, DT_BYTE=1, DT_INT=2, DT_REAL=3, DT_COMPLEX=4 };
 enum { CPU_SSE2=0x1, CPU_AVX2=0x2, CPU_FMA=0x4 };
+typedef void(*ae_destructor)(void*);
 
 /************************************************************************
 x-string (zero-terminated):
@@ -453,13 +458,11 @@ valgrind_hint   is a special field which stores a special hint pointer for
 typedef struct ae_dyn_block
 {
     struct ae_dyn_block * volatile p_next;
-    /* void *deallocator; */
-    void (*deallocator)(void*);
+    ae_destructor deallocator;
     void * volatile ptr;
     void* valgrind_hint;
 } ae_dyn_block;
 
-typedef void(*ae_deallocator)(void*);
 
 /************************************************************************
 frame marker
@@ -536,6 +539,10 @@ typedef struct ae_state
     void (*thread_exception_handler)(void*);
     
 } ae_state;
+
+typedef void(*ae_constructor)(void*,ae_state*,ae_bool);
+typedef void(*ae_copy_constructor)(void*,const void*,ae_state*,ae_bool);
+
 
 /************************************************************************
 Serializer:
@@ -679,8 +686,14 @@ typedef struct ae_smart_ptr
        calling destructor function AND calling ae_free for memory occupied by object. */
     ae_bool is_dynamic;
     
+    /* size of object; this field is used when we pass the object to ae_obj_array; it is zero for non-owned pointers */
+    ae_int_t size_of_object;
+    
+    /* copy constructor for the pointer */
+    ae_copy_constructor copy_constructor;
+    
     /* destructor function for pointer; clears all dynamically allocated memory */
-    void (*destroy)(void*);
+    ae_destructor destructor;
     
     /* frame entry; used to ensure automatic deallocation of smart pointer in case of exception/exit */
     ae_dyn_block frame_entry;
@@ -724,6 +737,38 @@ typedef struct
     ae_bool eternal;
 } ae_lock;
 
+typedef struct ae_obj_array
+{   
+    /* elements count */
+    ae_int_t cnt;
+    
+    /* storage size */
+    ae_int_t capacity;
+    
+    /* whether capacity can be automatically increased or not */
+    ae_bool fixed_capacity;
+    
+    /* pointers to objects */
+    void **pp_obj_ptr;
+    
+    /* pointers to object sizes */
+    ae_int_t *pp_obj_sizes;
+    
+    /* pointers to deallocators */
+    ae_copy_constructor *pp_copy;
+    
+    /* pointers to destructors */
+    ae_destructor *pp_destroy;
+    
+    /* primary synchronization lock, used for thread-safe appends */
+    ae_lock array_lock;
+    
+    /* a lock used to emulate full memory fence */
+    ae_lock barrier_lock;
+    
+    /* frame entry; used to ensure automatic deallocation of array and its elements in case of exception/exit */
+    ae_dyn_block frame_entry;
+} ae_obj_array;
 
 /*************************************************************************
 Shared pool: data structure used to provide thread-safe access to pool  of
@@ -767,13 +812,13 @@ typedef struct ae_shared_pool
     ae_int_t                size_of_object;
     
     /* initializer function; accepts pointer to malloc'ed object, initializes its fields */
-    void (*init)(void* dst, ae_state* state, ae_bool make_automatic);
+    ae_constructor init;
     
     /* copy constructor; accepts pointer to malloc'ed, but not initialized object */
-    void (*init_copy)(void* dst, void* src, ae_state* state, ae_bool make_automatic);
+    ae_copy_constructor init_copy;
     
     /* destructor function; */
-    void (*destroy)(void* ptr);
+    ae_destructor destroy;
     
     /* frame entry; contains pointer to the pool object itself */
     ae_dyn_block frame_entry;
@@ -798,7 +843,7 @@ void ae_trace_disable();
 ae_bool ae_is_trace_enabled(const char *tag);
 void ae_trace(const char * printf_fmt, ...);
 
-int ae_tickcount();
+ae_int_t ae_tickcount();
 
 
 /************************************************************************
@@ -809,6 +854,7 @@ void* ae_align(void *ptr, size_t alignment);
 ae_int_t ae_get_effective_workers(ae_int_t nworkers);
 void  ae_optional_atomic_add_i(ae_int_t *p, ae_int_t v);
 void  ae_optional_atomic_sub_i(ae_int_t *p, ae_int_t v);
+void  ae_mfence(ae_lock *lock);
 
 void* aligned_malloc(size_t size, size_t alignment);
 void* aligned_extract_ptr(void *block);
@@ -824,6 +870,9 @@ void  ae_free(void *p);
 ae_int_t ae_sizeof(ae_datatype datatype);
 ae_bool ae_check_zeros(const void *ptr, ae_int_t n);
 void ae_touch_ptr(void *p);
+
+ae_int_t ae_rand();
+ae_int_t ae_rand_max();
 
 void ae_state_init(ae_state *state);
 void ae_state_clear(ae_state *state);
@@ -842,7 +891,7 @@ void ae_db_free(ae_dyn_block *block);
 void ae_db_swap(ae_dyn_block *block1, ae_dyn_block *block2);
 
 void ae_vector_init(ae_vector *dst, ae_int_t size, ae_datatype datatype, ae_state *state, ae_bool make_automatic);
-void ae_vector_init_copy(ae_vector *dst, ae_vector *src, ae_state *state, ae_bool make_automatic);
+void ae_vector_init_copy(ae_vector *dst, const ae_vector *src, ae_state *state, ae_bool make_automatic);
 void ae_vector_init_from_x(ae_vector *dst, x_vector *src, ae_state *state, ae_bool make_automatic);
 void ae_vector_init_attach_to_x(ae_vector *dst, x_vector *src, ae_state *state, ae_bool make_automatic);
 void ae_vector_set_length(ae_vector *dst, ae_int_t newsize, ae_state *state);
@@ -852,7 +901,7 @@ void ae_vector_destroy(ae_vector *dst);
 void ae_swap_vectors(ae_vector *vec1, ae_vector *vec2);
 
 void ae_matrix_init(ae_matrix *dst, ae_int_t rows, ae_int_t cols, ae_datatype datatype, ae_state *state, ae_bool make_automatic);
-void ae_matrix_init_copy(ae_matrix *dst, ae_matrix *src, ae_state *state, ae_bool make_automatic);
+void ae_matrix_init_copy(ae_matrix *dst, const ae_matrix *src, ae_state *state, ae_bool make_automatic);
 void ae_matrix_init_from_x(ae_matrix *dst, x_matrix *src, ae_state *state, ae_bool make_automatic);
 void ae_matrix_init_attach_to_x(ae_matrix *dst, x_matrix *src, ae_state *state, ae_bool make_automatic);
 void ae_matrix_set_length(ae_matrix *dst, ae_int_t rows, ae_int_t cols, ae_state *state);
@@ -863,8 +912,18 @@ void ae_swap_matrices(ae_matrix *mat1, ae_matrix *mat2);
 void ae_smart_ptr_init(ae_smart_ptr *dst, void **subscriber, ae_state *state, ae_bool make_automatic);
 void ae_smart_ptr_clear(void *_dst); /* accepts ae_smart_ptr* */
 void ae_smart_ptr_destroy(void *_dst);
-void ae_smart_ptr_assign(ae_smart_ptr *dst, void *new_ptr, ae_bool is_owner, ae_bool is_dynamic, void (*destroy)(void*));
+void ae_smart_ptr_assign(ae_smart_ptr *dst, void *new_ptr, ae_bool is_owner, ae_bool is_dynamic, ae_int_t obj_size, ae_copy_constructor cc, ae_destructor dd);
 void ae_smart_ptr_release(ae_smart_ptr *dst);
+
+void ae_obj_array_init(ae_obj_array *dst, ae_state *state, ae_bool make_automatic);
+void ae_obj_array_init_copy(ae_obj_array *dst, const ae_obj_array *src, ae_state *state, ae_bool make_automatic);
+void ae_obj_array_clear(ae_obj_array *dst);
+void ae_obj_array_destroy(ae_obj_array *dst);
+ae_int_t ae_obj_array_get_length(ae_obj_array *dst);
+void ae_obj_array_fixed_capacity(ae_obj_array *arr, ae_int_t idx, ae_state *state);
+void ae_obj_array_get(ae_obj_array *arr, ae_int_t idx, ae_smart_ptr *ptr, ae_state *state);
+void ae_obj_array_set_transfer(ae_obj_array *arr, ae_int_t idx, ae_smart_ptr *ptr, ae_state *state);
+ae_int_t ae_obj_array_append_transfer(ae_obj_array *arr, ae_smart_ptr *ptr, ae_state *state);
 
 void ae_yield();
 void ae_init_lock(ae_lock *lock, ae_state *state, ae_bool make_automatic);
@@ -874,7 +933,7 @@ void ae_release_lock(ae_lock *lock);
 void ae_free_lock(ae_lock *lock);
 
 void ae_shared_pool_init(void *_dst, ae_state *state, ae_bool make_automatic);
-void ae_shared_pool_init_copy(void *_dst, void *_src, ae_state *state, ae_bool make_automatic);
+void ae_shared_pool_init_copy(void *_dst, const void *_src, ae_state *state, ae_bool make_automatic);
 void ae_shared_pool_clear(void *dst);
 void ae_shared_pool_destroy(void *dst);
 ae_bool ae_shared_pool_is_initialized(void *_dst);
@@ -882,9 +941,9 @@ void ae_shared_pool_set_seed(
     ae_shared_pool  *dst,
     void            *seed_object,
     ae_int_t        size_of_object,
-    void            (*init)(void* dst, ae_state* state, ae_bool make_automatic),
-    void            (*init_copy)(void* dst, void* src, ae_state* state, ae_bool make_automatic),
-    void            (*destroy)(void* ptr),
+    ae_constructor  constructor,
+    ae_copy_constructor copy_constructor,
+    ae_destructor   destructor,
     ae_state        *state);
 void ae_shared_pool_retrieve(
     ae_shared_pool  *pool,
@@ -1109,7 +1168,7 @@ typedef struct rcommstate
     ae_vector ca;
 } rcommstate;
 void _rcommstate_init(rcommstate* p, ae_state *_state, ae_bool make_automatic);
-void _rcommstate_init_copy(rcommstate* dst, rcommstate* src, ae_state *_state, ae_bool make_automatic);
+void _rcommstate_init_copy(rcommstate* dst, const rcommstate* src, ae_state *_state, ae_bool make_automatic);
 void _rcommstate_clear(rcommstate* p);
 void _rcommstate_destroy(rcommstate* p);
 
@@ -1290,6 +1349,16 @@ inclusion of this header file
     
 #endif
 
+/************************************************************************
+APSERV overrides
+************************************************************************/
+#if !defined(ALGLIB_NO_FAST_KERNELS)
+/*************************************************************************
+Maximum concurrency on given system, with given compilation settings
+*************************************************************************/
+ae_int_t maxconcurrency(ae_state *_state);
+#endif
+
 
 }
 
@@ -1339,6 +1408,7 @@ public:
     complex(const double &_x);
     complex(const double &_x, const double &_y);
     complex(const complex &z);
+    complex(const alglib_impl::ae_complex &z):x(z.x),y(z.y){};
 
     complex& operator= (const double& v);
     complex& operator+=(const double& v);
@@ -2699,6 +2769,35 @@ ae_bool spchol_updatekernel4444(/* Real    */ ae_vector* rowstorage,
      ae_int_t urbase,
      ae_state *_state);
      
+/*
+ * Far field expansions for RBFs
+ */
+ae_bool rbfv3farfields_bhpaneleval1fastkernel(double d0,
+     double d1,
+     double d2,
+     ae_int_t panelp,
+     /* Real    */ ae_vector* pnma,
+     /* Real    */ ae_vector* pnmb,
+     /* Real    */ ae_vector* pmmcdiag,
+     /* Real    */ ae_vector* ynma,
+     /* Real    */ ae_vector* tblrmodmn,
+     double* f,
+     double* invpowrpplus1,
+     ae_state *_state);
+ae_bool rbfv3farfields_bhpanelevalfastkernel(double d0,
+     double d1,
+     double d2,
+     ae_int_t ny,
+     ae_int_t panelp,
+     /* Real    */ ae_vector* pnma,
+     /* Real    */ ae_vector* pnmb,
+     /* Real    */ ae_vector* pmmcdiag,
+     /* Real    */ ae_vector* ynma,
+     /* Real    */ ae_vector* tblrmodmn,
+     /* Real    */ ae_vector* f,
+     double* invpowrpplus1,
+     ae_state *_state);
+
 /* ALGLIB_NO_FAST_KERNELS */
 #endif
 
@@ -3606,10 +3705,17 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_DLU
 #endif
 
+#ifdef AE_COMPILE_APSTRUCT
+#define AE_PARTIAL_BUILD
+#define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
+#endif
+
 #ifdef AE_COMPILE_AMDORDERING
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
 #define AE_COMPILE_ABLASF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_SCODES
@@ -3628,6 +3734,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_HQRND
 #define AE_COMPILE_TSORT
 #define AE_COMPILE_SPARSE
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #endif
 
@@ -3643,6 +3750,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -3672,6 +3780,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_EVD
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_TRFAC
@@ -3723,6 +3832,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -3757,6 +3867,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_MATGEN
@@ -3779,6 +3890,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -3813,6 +3925,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -3908,6 +4021,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -3939,6 +4053,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_ROTATIONS
@@ -3971,6 +4086,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_ROTATIONS
@@ -4001,6 +4117,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -4036,6 +4153,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -4060,6 +4178,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -4094,6 +4213,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -4130,6 +4250,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -4178,6 +4299,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_ROTATIONS
@@ -4211,6 +4333,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -4257,6 +4380,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SVD
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_MATGEN
@@ -4288,6 +4412,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -4339,6 +4464,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_ROTATIONS
@@ -4389,6 +4515,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_ROTATIONS
@@ -4422,6 +4549,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_ROTATIONS
@@ -4450,6 +4578,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_APSERV
 #define AE_COMPILE_ABLASF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_SCODES
 #define AE_COMPILE_ABLASMKL
 #define AE_COMPILE_HQRND
@@ -4469,6 +4598,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -4490,6 +4620,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -4536,6 +4667,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_ROTATIONS
@@ -4571,6 +4703,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_ROTATIONS
@@ -4618,6 +4751,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_ROTATIONS
@@ -4656,6 +4790,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_ROTATIONS
@@ -4695,6 +4830,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_ROTATIONS
@@ -4724,6 +4860,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_ABLAS
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -4804,6 +4941,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -4835,6 +4973,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -5098,6 +5237,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -5126,6 +5266,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -5156,6 +5297,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -5214,6 +5356,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_ROTATIONS
@@ -5265,6 +5408,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -5304,6 +5448,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -5347,6 +5492,14 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_LSFIT
 #endif
 
+#ifdef AE_COMPILE_RBFV3FARFIELDS
+#define AE_PARTIAL_BUILD
+#define AE_COMPILE_SCODES
+#define AE_COMPILE_APSERV
+#define AE_COMPILE_ABLASF
+#define AE_COMPILE_TSORT
+#endif
+
 #ifdef AE_COMPILE_RBFV3
 #define AE_PARTIAL_BUILD
 #define AE_COMPILE_SCODES
@@ -5360,6 +5513,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -5375,6 +5529,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_ORTFAC
 #define AE_COMPILE_FBLS
 #define AE_COMPILE_ITERATIVESPARSE
+#define AE_COMPILE_RBFV3FARFIELDS
 #endif
 
 #ifdef AE_COMPILE_SPLINE2D
@@ -5389,6 +5544,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -5421,6 +5577,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -5476,6 +5633,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -5511,6 +5669,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_ROTATIONS
@@ -5566,6 +5725,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
@@ -5611,6 +5771,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_RBFV2
 #define AE_COMPILE_DIRECTSPARSESOLVERS
 #define AE_COMPILE_ITERATIVESPARSE
+#define AE_COMPILE_RBFV3FARFIELDS
 #define AE_COMPILE_RBFV3
 #endif
 
@@ -5916,6 +6077,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_EVD
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_TRFAC
@@ -5941,6 +6103,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SPARSE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_ROTATIONS
@@ -5988,6 +6151,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_SVD
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_MATGEN
@@ -6032,6 +6196,7 @@ ae_bool _ialglib_i_hpcchunkedprocess(/* Real    */ ae_vector* weights,
 #define AE_COMPILE_MLPE
 #define AE_COMPILE_DLU
 #define AE_COMPILE_SPTRF
+#define AE_COMPILE_APSTRUCT
 #define AE_COMPILE_AMDORDERING
 #define AE_COMPILE_SPCHOL
 #define AE_COMPILE_CREFLECTIONS
